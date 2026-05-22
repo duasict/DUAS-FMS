@@ -32,7 +32,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   static const _selectableRoles = [
     ('vo',   'Visual Observer',  Icons.visibility_outlined),
     ('gcs',  'GCS Operator',     Icons.settings_remote_outlined),
-    ('tech', 'Technician',       Icons.build_outlined),
+    ('tech', 'Technical Crew Member', Icons.build_outlined),
   ];
 
   @override
@@ -374,7 +374,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           if (isPic)
             _roleRow(
               icon: Icons.verified_outlined,
-              label: 'Person in Command',
+              label: 'Pilot in Command',
               sublabel: 'Granted via CAAP license verification',
               selected: true,
               locked: true,
@@ -385,7 +385,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           if (!isCrp && !isPic)
             _roleRow(
               icon: Icons.lock_outline,
-              label: 'Person in Command',
+              label: 'Pilot in Command',
               sublabel: 'Scan your CAAP license to unlock',
               selected: false,
               locked: true,

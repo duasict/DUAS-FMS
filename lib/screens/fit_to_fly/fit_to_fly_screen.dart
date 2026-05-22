@@ -263,7 +263,7 @@ class _FitToFlyScreenState extends State<FitToFlyScreen> {
         _field(_payloadCtrl, 'Payload Installed',
             hint: 'e.g. Multispectral, RGB Camera, LiDAR'),
         SizedBox(height: 10),
-        _field(_picCtrl, 'PIC — Person in Command'),
+        _field(_picCtrl, 'PIC — Pilot in Command'),
       ]),
     );
   }

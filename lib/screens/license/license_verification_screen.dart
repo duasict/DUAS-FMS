@@ -209,7 +209,7 @@ class _LicenseVerificationScreenState
         const SizedBox(height: 12),
         Text(
           'Scan your CAAP Remote Pilot Certificate to verify your identity and '
-          'receive Person in Command (PIC) status.',
+          'receive Pilot in Command (PIC) status.',
           textAlign: TextAlign.center,
           style:
               TextStyle(color: context.colors.textSecondary, fontSize: 14, height: 1.5),
@@ -230,7 +230,7 @@ class _LicenseVerificationScreenState
         _infoCard(
             Icons.security_outlined,
             'PIC Status',
-            'Once verified, your profile is updated with PIC (Person in Command) '
+            'Once verified, your profile is updated with PIC (Pilot in Command) '
                 'status, allowing you to be assigned as RPIC on missions.'),
         const SizedBox(height: 36),
         _primaryButton(
@@ -786,7 +786,7 @@ class _LicenseVerificationScreenState
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Your profile will be updated with PIC (Person in Command) status, '
+                  'Your profile will be updated with PIC (Pilot in Command) status, '
                   'enabling you to be assigned as RPIC on missions.',
                   style: TextStyle(
                       color: AppColors.success,

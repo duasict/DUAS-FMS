@@ -255,7 +255,7 @@ class _MissionApprovalScreenState extends State<MissionApprovalScreen> {
   Widget _crewBriefingCard(Mission m) {
     final briefings = <Map<String, String>>[
       for (final c in m.crew)
-        {'name': c.name, 'role': c.role, 'brief': _roleBrief(c.role)},
+        {'name': c.name, 'role': _roleLabel(c.role), 'brief': _roleBrief(c.role)},
     ];
 
     return MissionFlowCard(
@@ -352,6 +352,16 @@ class _MissionApprovalScreenState extends State<MissionApprovalScreen> {
     );
   }
 
+  String _roleLabel(String role) {
+    switch (role.toLowerCase()) {
+      case 'rpic':  return 'RPIC — Remote Pilot in Command';
+      case 'vo':    return 'VO — Visual Observer';
+      case 'gcs':   return 'GCS Operator';
+      case 'tech':  return 'Technical Crew Member';
+      default:      return role.toUpperCase();
+    }
+  }
+
   String _roleBrief(String role) {
     switch (role.toUpperCase()) {
       case 'RPIC':
@@ -362,7 +372,7 @@ class _MissionApprovalScreenState extends State<MissionApprovalScreen> {
       case 'GCS':
         return 'Operate ground control station. Monitor telemetry, battery, and data links. Coordinate with RPIC on all GCS observations.';
       case 'TECH':
-        return 'Responsible for equipment preparation, maintenance checks, and data offload after the mission.';
+        return 'Technical Crew Member — responsible for equipment preparation, airframe maintenance checks, and data offload after the mission.';
       default:
         return 'Follow RPIC instructions. Maintain communication discipline. Report any safety concerns immediately.';
     }

@@ -3,7 +3,7 @@ class UserProfile {
   final String supabaseId;     // Supabase auth.users UUID
   final String name;
   // Profile roles: crp | pic | vo | gcs | tech
-  // 'pic' (Person in Command) is AUTO-ASSIGNED when licenseVerified=true
+  // 'pic' (Pilot in Command) is AUTO-ASSIGNED when licenseVerified=true
   //   and license is not expired. Replaces 'rpic' at the profile level.
   //   'rpic' (Remote Pilot in Command) is mission-specific only (crew role).
   final String role;
@@ -115,13 +115,13 @@ class UserProfile {
       case 'crp':
         return 'Chief Remote Pilot';
       case 'pic':
-        return 'Person in Command';
+        return 'Pilot in Command';
       case 'vo':
         return 'Visual Observer';
       case 'gcs':
         return 'GCS Operator';
       case 'tech':
-        return 'Technician';
+        return 'Technical Crew Member';
       default:
         return role.toUpperCase();
     }

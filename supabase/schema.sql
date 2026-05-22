@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   photo_url           TEXT,
   -- Profile roles:
   --   crp  = Chief Remote Pilot (org-level admin, assigned by CRP or admin)
-  --   pic  = Person in Command (auto-granted when CAAP license verified + non-expired)
+  --   pic  = Pilot in Command (auto-granted when CAAP license verified + non-expired)
   --   vo   = Visual Observer
   --   gcs  = GCS Operator
   --   tech = Technician
@@ -51,8 +51,8 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-COMMENT ON TABLE public.profiles IS 'User profiles. Profile roles: crp | pic | vo | gcs | tech. Mission crew role ''rpic'' is separate and mission-specific.';
-COMMENT ON COLUMN public.profiles.role IS 'crp=Chief Remote Pilot | pic=Person in Command (license verified) | vo | gcs | tech';
+COMMENT ON TABLE public.profiles IS 'User profiles. Profile roles: crp (Chief Remote Pilot) | pic (Pilot in Command) | vo | gcs | tech. Mission crew role ''rpic'' is separate and mission-specific.';
+COMMENT ON COLUMN public.profiles.role IS 'crp=Chief Remote Pilot | pic=Pilot in Command (license verified) | vo | gcs | tech';
 COMMENT ON COLUMN public.profiles.license_verified IS 'TRUE only after in-app CAAP ID card OCR scan. Cannot be set manually.';
 COMMENT ON COLUMN public.profiles.face_verified IS 'TRUE when selfie matched ID photo during license verification.';
 

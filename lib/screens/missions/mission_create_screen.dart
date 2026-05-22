@@ -4,6 +4,7 @@ import '../../database/database_helper.dart';
 import '../../models/aircraft.dart';
 import '../../models/crew_member.dart';
 import '../../models/mission.dart';
+import '../../models/user_profile.dart';
 import '../../providers/app_provider.dart';
 import '../../theme/app_theme.dart';
 import '../mission_details/mission_details_screen.dart';
@@ -22,7 +23,9 @@ class _MissionCreateScreenState extends State<MissionCreateScreen> {
   final _crpNotesCtrl = TextEditingController();
 
   // Fixed crew slots
-  final _rpicCtrl = TextEditingController();     // required RPIC
+  // RPIC must be a verified PIC — chosen from a picker, not free text
+  UserProfile? _selectedRpic;
+  List<UserProfile> _eligiblePilots = [];
   final _voGcsCtrl = TextEditingController();    // required VO or GCS
 
   // Extra crew (tech / additional VO)
@@ -61,12 +64,19 @@ class _MissionCreateScreenState extends State<MissionCreateScreen> {
   }
 
   Future<void> _init() async {
-    final ac = await DatabaseHelper.instance.getAircraft();
-    final id = await DatabaseHelper.instance.nextMissionId();
+    final results = await Future.wait([
+      DatabaseHelper.instance.getAircraft(),
+      DatabaseHelper.instance.nextMissionId(),
+      DatabaseHelper.instance.getEligiblePilots(),
+    ]);
+    final ac = results[0] as List<Aircraft>;
+    final id = results[1] as String;
+    final pilots = results[2] as List<UserProfile>;
     if (!mounted) return;
     setState(() {
       _aircraft = ac;
       _generatedId = id;
+      _eligiblePilots = pilots;
       if (ac.isNotEmpty) {
         _selectedAircraftId = ac.first.id;
         _selectedAircraftName = ac.first.name;
@@ -82,7 +92,6 @@ class _MissionCreateScreenState extends State<MissionCreateScreen> {
     _locationCtrl.dispose();
     _objectiveCtrl.dispose();
     _crpNotesCtrl.dispose();
-    _rpicCtrl.dispose();
     _voGcsCtrl.dispose();
     for (final c in _extraNameCtrls) {
       c.dispose();
@@ -145,7 +154,7 @@ class _MissionCreateScreenState extends State<MissionCreateScreen> {
     if (_titleCtrl.text.trim().isEmpty ||
         _locationCtrl.text.trim().isEmpty ||
         _objectiveCtrl.text.trim().isEmpty ||
-        _rpicCtrl.text.trim().isEmpty ||
+        _selectedRpic == null ||
         _voGcsCtrl.text.trim().isEmpty ||
         _selectedAircraftId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -180,7 +189,7 @@ class _MissionCreateScreenState extends State<MissionCreateScreen> {
 
     // Crew: 1 RPIC (required) + 1 VO or GCS (required) + extras
     final crew = <Map<String, String>>[
-      {'name': _rpicCtrl.text.trim(), 'role': 'rpic'},
+      {'name': _selectedRpic!.name, 'role': 'rpic'},
       {'name': _voGcsCtrl.text.trim(), 'role': _voGcsRole},
     ];
     for (var i = 0; i < _extraNameCtrls.length; i++) {
@@ -303,13 +312,8 @@ class _MissionCreateScreenState extends State<MissionCreateScreen> {
                 ),
                 const SizedBox(height: 10),
 
-                // RPIC row
-                _crewRow(
-                  controller: _rpicCtrl,
-                  label: 'RPIC — Remote Pilot in Command *',
-                  roleDisplay: 'RPIC',
-                  roleColor: AppColors.primary,
-                ),
+                // RPIC row — must be a verified PIC
+                _rpicPickerRow(),
                 const SizedBox(height: 10),
 
                 // VO / GCS row with role toggle
@@ -494,35 +498,130 @@ class _MissionCreateScreenState extends State<MissionCreateScreen> {
     });
   }
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
+  // ── RPIC picker row ───────────────────────────────────────────────────────
 
-  Widget _crewRow({
-    required TextEditingController controller,
-    required String label,
-    required String roleDisplay,
-    required Color roleColor,
-  }) {
-    return Row(children: [
-      Container(
-        width: 32,
-        height: 32,
+  Widget _rpicPickerRow() {
+    final hasPilots = _eligiblePilots.isNotEmpty;
+    return GestureDetector(
+      onTap: hasPilots ? _showRpicPicker : null,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: roleColor.withValues(alpha: 0.1),
-          shape: BoxShape.circle,
+          color: context.colors.surface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: _selectedRpic == null && !hasPilots
+                ? AppColors.danger.withValues(alpha: 0.4)
+                : context.colors.border,
+          ),
         ),
-        child: Icon(Icons.person, size: 16, color: roleColor),
+        child: Row(children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.person, size: 16, color: AppColors.primary),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'RPIC — Remote Pilot in Command *',
+                  style: TextStyle(
+                      color: context.colors.textMuted, fontSize: 10),
+                ),
+                const SizedBox(height: 2),
+                if (_selectedRpic != null)
+                  Text(
+                    _selectedRpic!.name,
+                    style: TextStyle(
+                        color: context.colors.textPrimary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500),
+                  )
+                else if (!hasPilots)
+                  Text(
+                    'No verified PICs found — verify a license first',
+                    style: TextStyle(
+                        color: AppColors.danger, fontSize: 12),
+                  )
+                else
+                  Text(
+                    'Tap to select a verified PIC',
+                    style: TextStyle(
+                        color: context.colors.textSecondary, fontSize: 12),
+                  ),
+              ],
+            ),
+          ),
+          if (hasPilots)
+            Icon(Icons.arrow_drop_down,
+                color: context.colors.textMuted, size: 20),
+        ]),
       ),
-      const SizedBox(width: 10),
-      Expanded(
-        child: TextField(
-          controller: controller,
-          style:
-              TextStyle(color: context.colors.textPrimary, fontSize: 13),
-          decoration: InputDecoration(labelText: label),
-        ),
-      ),
-    ]);
+    );
   }
+
+  void _showRpicPicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: context.colors.card,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(children: [
+                  const Icon(Icons.verified_user_outlined,
+                      size: 16, color: AppColors.primary),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Select RPIC',
+                    style: TextStyle(
+                        color: context.colors.textPrimary,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600),
+                  ),
+                ]),
+              ),
+              const Divider(height: 1),
+              ...(_eligiblePilots.map((p) => ListTile(
+                    leading: const Icon(Icons.person_outline,
+                        color: AppColors.primaryLight),
+                    title: Text(p.name,
+                        style: TextStyle(
+                            color: context.colors.textPrimary,
+                            fontSize: 14)),
+                    subtitle: Text(
+                      '${p.licenseNumber}  ·  PIC',
+                      style: TextStyle(
+                          color: context.colors.textMuted, fontSize: 11),
+                    ),
+                    onTap: () {
+                      setState(() => _selectedRpic = p);
+                      Navigator.pop(ctx);
+                    },
+                  ))),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
 
   Widget _sectionHeader(IconData icon, String title) {
     return Padding(

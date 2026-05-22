@@ -39,15 +39,80 @@ class SupabaseService {
   static Future<void> upsertProfile(Map<String, dynamic> data) =>
       client.from('profiles').upsert(data);
 
-  // ── Sync helpers ─────────────────────────────────────────────────────────
-  // These will be fleshed out once auth + profile flow is stable.
+  // ── Missions ─────────────────────────────────────────────────────────────
 
-  static Future<void> upsertMission(Map<String, dynamic> data) =>
-      client.from('missions').upsert(data);
+  /// Upserts a mission and returns its Supabase UUID.
+  /// Conflict key: (mission_ref, organization_id) — must be UNIQUE in schema.
+  static Future<String> upsertMissionGetId(
+      Map<String, dynamic> data) async {
+    final result = await client
+        .from('missions')
+        .upsert(data, onConflict: 'mission_ref,organization_id')
+        .select('id')
+        .single();
+    return result['id'] as String;
+  }
 
-  static Future<void> upsertChecklist(List<Map<String, dynamic>> rows) =>
-      client.from('checklist_items').upsert(rows);
+  // ── Mission Crew ──────────────────────────────────────────────────────────
+
+  /// Replaces all crew records for a mission (delete + insert).
+  static Future<void> replaceCrewForMission(
+      String missionUuid, List<Map<String, dynamic>> crew) async {
+    await client
+        .from('mission_crew')
+        .delete()
+        .eq('mission_id', missionUuid);
+    if (crew.isNotEmpty) {
+      await client.from('mission_crew').insert(crew);
+    }
+  }
+
+  // ── HIRA Rows ─────────────────────────────────────────────────────────────
+
+  /// Replaces all HIRA rows for a mission (delete + insert).
+  static Future<void> replaceHiraRows(
+      String missionUuid, List<Map<String, dynamic>> rows) async {
+    await client
+        .from('hira_rows')
+        .delete()
+        .eq('mission_id', missionUuid);
+    if (rows.isNotEmpty) {
+      await client.from('hira_rows').insert(rows);
+    }
+  }
+
+  // ── Checklist Items ───────────────────────────────────────────────────────
+
+  /// Replaces all checklist items for a mission (delete + insert).
+  static Future<void> replaceChecklistItems(
+      String missionUuid, List<Map<String, dynamic>> items) async {
+    await client
+        .from('checklist_items')
+        .delete()
+        .eq('mission_id', missionUuid);
+    if (items.isNotEmpty) {
+      await client.from('checklist_items').insert(items);
+    }
+  }
+
+  // ── Flight Plans ──────────────────────────────────────────────────────────
+
+  static Future<void> upsertFlightPlan(Map<String, dynamic> data) =>
+      client
+          .from('flight_plans')
+          .upsert(data, onConflict: 'mission_id');
+
+  // ── Fit-to-Fly Records ────────────────────────────────────────────────────
+
+  static Future<void> upsertFitToFly(Map<String, dynamic> data) =>
+      client
+          .from('fit_to_fly_records')
+          .upsert(data, onConflict: 'mission_id');
+
+  // ── Flight Logs ───────────────────────────────────────────────────────────
 
   static Future<void> upsertFlightLog(Map<String, dynamic> data) =>
-      client.from('flight_logs').upsert(data);
+      client
+          .from('flight_logs')
+          .upsert(data, onConflict: 'mission_id');
 }

@@ -952,6 +952,65 @@ class DatabaseHelper {
         where: 'id = ?', whereArgs: [log.id]);
   }
 
+  // ─── Sync helpers ─────────────────────────────────────────────────────────
+
+  /// Returns all missions that have not yet been pushed to Supabase,
+  /// with their crew already populated.
+  Future<List<Mission>> getUnsyncedMissions() async {
+    final db = await database;
+    final rows = await db.query(
+      'missions',
+      where: 'is_synced = 0',
+      orderBy: 'created_at ASC',
+    );
+    final missions = <Mission>[];
+    for (final row in rows) {
+      final m = Mission.fromMap(row);
+      if (m.id != null) {
+        final crewRows = await db.query(
+          'crew_members',
+          where: 'mission_id = ?',
+          whereArgs: [m.id],
+        );
+        m.crew = crewRows.map(CrewMember.fromMap).toList();
+      }
+      missions.add(m);
+    }
+    return missions;
+  }
+
+  /// Returns all checklist items for a mission across all checklist types.
+  Future<List<ChecklistItem>> getAllChecklistItemsByMissionId(
+      int missionId) async {
+    final db = await database;
+    final rows = await db.query(
+      'checklist_items',
+      where: 'mission_id = ?',
+      whereArgs: [missionId],
+      orderBy: 'checklist_type ASC, item_index ASC',
+    );
+    return rows.map(ChecklistItem.fromMap).toList();
+  }
+
+  /// Marks a single mission (and its associated flight_log) as synced.
+  Future<void> markMissionSynced(int localMissionId) async {
+    final db = await database;
+    final batch = db.batch();
+    batch.update(
+      'missions',
+      {'is_synced': 1},
+      where: 'id = ?',
+      whereArgs: [localMissionId],
+    );
+    batch.update(
+      'flight_logs',
+      {'is_synced': 1},
+      where: 'mission_id = ? AND is_synced = 0',
+      whereArgs: [localMissionId],
+    );
+    await batch.commit(noResult: true);
+  }
+
   // ─── Sync ─────────────────────────────────────────────────────────────────
 
   Future<int> getUnsyncedCount() async {
@@ -1085,5 +1144,29 @@ class DatabaseHelper {
         whereArgs: [existing.first['id']],
       );
     }
+  }
+
+  /// Returns all local profiles eligible as RPIC (role = 'pic' or 'crp',
+  /// license_verified = 1, license not expired or no expiry set).
+  /// Used for the RPIC picker in mission creation.
+  Future<List<UserProfile>> getEligiblePilots() async {
+    final db = await database;
+    // Fetch pic + crp users who have a verified license
+    final rows = await db.query(
+      'user_profile',
+      where: "role IN ('pic', 'crp') AND license_verified = 1",
+    );
+    final today = DateTime.now();
+    return rows
+        .map(UserProfile.fromMap)
+        .where((p) {
+          if (p.licenseExpiryDate == null) return true;
+          try {
+            return !DateTime.parse(p.licenseExpiryDate!).isBefore(today);
+          } catch (_) {
+            return true;
+          }
+        })
+        .toList();
   }
 }

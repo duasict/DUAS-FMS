@@ -108,9 +108,10 @@ class _FlightLogScreenState extends State<FlightLogScreen> {
         _modelCtrl.text = m.aircraftName;
         _missionType = _inferType(m.title);
         for (final c in m.crew) {
-          if (c.role == 'RPIC') _rpicCtrl.text = c.name;
-          if (c.role == 'VO') _voCtrl.text = c.name;
-          if (c.role == 'Tech') _techCtrl.text = c.name;
+          final r = c.role.toLowerCase();
+          if (r == 'rpic') _rpicCtrl.text = c.name;
+          if (r == 'vo') _voCtrl.text = c.name;
+          if (r == 'tech') _techCtrl.text = c.name;
         }
         _isLoading = false;
       });

@@ -16,7 +16,14 @@ class UserProfileProvider extends ChangeNotifier {
   Future<void> load() async {
     final saved = await DatabaseHelper.instance.getUserProfile();
     if (saved != null) {
-      _profile = saved;
+      // Auto-demote expired PIC to 'tech' — license must be re-verified
+      if (saved.role == 'pic' && saved.isLicenseExpired) {
+        final demoted = saved.copyWith(role: 'tech');
+        await DatabaseHelper.instance.saveUserProfile(demoted);
+        _profile = demoted;
+      } else {
+        _profile = saved;
+      }
       notifyListeners();
     }
   }

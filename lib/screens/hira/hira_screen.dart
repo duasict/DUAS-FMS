@@ -5,6 +5,7 @@ import '../../models/hira_row.dart';
 import '../../providers/app_provider.dart';
 import '../../theme/app_theme.dart';
 import '../checklists/checklist_widgets.dart';
+import '../equipment_checklist/equipment_checklist_screen.dart';
 import '../mission_approval/mission_approval_screen.dart';
 import '../shared/mission_flow_widgets.dart';
 
@@ -137,14 +138,28 @@ class _HiraScreenState extends State<HiraScreen> {
         await DatabaseHelper.instance.getMissionById(widget.missionId);
     if (mission != null) {
       mission.hasHiraComplete = true;
+      mission.crpConcurrenceRequired = _hasHighRisk;
       await provider.updateMission(mission);
     }
 
     if (!mounted) return;
     setState(() => _isSaving = false);
-    navigator.push(MaterialPageRoute(
-      builder: (_) => MissionApprovalScreen(missionId: widget.missionId),
-    ));
+
+    // High-risk: MissionApprovalScreen._approve() already pushes
+    // EquipmentChecklistScreen — so we just go there first.
+    // Low-risk: skip approval and go straight to equipment checklist.
+    if (_hasHighRisk) {
+      navigator.push(MaterialPageRoute(
+        builder: (_) => MissionApprovalScreen(missionId: widget.missionId),
+      ));
+    } else {
+      navigator.push(MaterialPageRoute(
+        builder: (_) => EquipmentChecklistScreen(
+          missionId: widget.missionId,
+          missionTitle: widget.missionTitle,
+        ),
+      ));
+    }
   }
 
   @override
@@ -187,7 +202,9 @@ class _HiraScreenState extends State<HiraScreen> {
               ],
             ),
       bottomNavigationBar: MissionActionBar(
-        label: 'Save & Continue to Mission Approval',
+        label: _hasHighRisk
+            ? 'Save & Request CRP Approval'
+            : 'Save & Continue to Equipment Checklist',
         isSaving: _isSaving,
         onAction: _submit,
       ),
