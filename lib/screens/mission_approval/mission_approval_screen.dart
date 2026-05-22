@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../../database/database_helper.dart';
 import '../../models/flight_plan.dart';
 import '../../models/hira_row.dart';
 import '../../models/mission.dart';
-import '../../providers/app_provider.dart';
 import '../../theme/app_theme.dart';
 import '../equipment_checklist/equipment_checklist_screen.dart';
 import '../shared/mission_flow_widgets.dart';
@@ -48,15 +46,7 @@ class _MissionApprovalScreenState extends State<MissionApprovalScreen> {
 
   Future<void> _approve() async {
     setState(() => _isSaving = true);
-    final provider = context.read<AppProvider>();
     final navigator = Navigator.of(context);
-
-    final mission =
-        await DatabaseHelper.instance.getMissionById(widget.missionId);
-    if (mission != null) {
-      mission.hasApprovalComplete = true;
-      await provider.updateMission(mission);
-    }
 
     if (!mounted) return;
     setState(() => _isSaving = false);
@@ -170,7 +160,8 @@ class _MissionApprovalScreenState extends State<MissionApprovalScreen> {
         _row(Icons.location_on_outlined, 'Location', m.location),
         _row(Icons.air, 'Aircraft', '${m.aircraftName} (${m.aircraftType})'),
         _row(Icons.terrain, 'Environment', m.environment),
-        _row(Icons.person_outline, 'Approved By', m.approvedBy),
+        if (m.crpAdvisoryNotes.isNotEmpty)
+          _row(Icons.notes_outlined, 'CRP Advisory', m.crpAdvisoryNotes),
       ]),
     );
   }

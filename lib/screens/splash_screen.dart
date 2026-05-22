@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_constants.dart';
 import 'login_screen.dart';
+import 'main_navigation.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -28,18 +30,32 @@ class _SplashScreenState extends State<SplashScreen>
         .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic));
     _ctrl.forward();
 
-    Future.delayed(const Duration(milliseconds: 2400), () {
-      if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        PageRouteBuilder(
-          pageBuilder: (_, _, _) => LoginScreen(),
-          transitionsBuilder: (_, anim, _, child) =>
-              FadeTransition(opacity: anim, child: child),
-          transitionDuration: Duration(milliseconds: 500),
-        ),
-      );
-    });
+    // Minimum splash display time + auth check
+    Future.wait([
+      Future.delayed(const Duration(milliseconds: 2200)),
+      _checkAuth(),
+    ]).then((_) => _navigate());
+  }
+
+  Widget? _destination;
+
+  Future<void> _checkAuth() async {
+    final session = SupabaseService.currentSession;
+    _destination =
+        session != null ? const MainNavigation() : const LoginScreen();
+  }
+
+  void _navigate() {
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (_, _, _) => _destination ?? const LoginScreen(),
+        transitionsBuilder: (_, anim, _, child) =>
+            FadeTransition(opacity: anim, child: child),
+        transitionDuration: const Duration(milliseconds: 500),
+      ),
+    );
   }
 
   @override
@@ -72,14 +88,9 @@ class _SplashScreenState extends State<SplashScreen>
                       width: 1.5,
                     ),
                   ),
-                  child: Icon(
-                    Icons.air,
-                    color: AppColors.primary,
-                    size: 44,
-                  ),
+                  child: const Icon(Icons.air, color: AppColors.primary, size: 44),
                 ),
-                SizedBox(height: 28),
-                // App name
+                const SizedBox(height: 28),
                 Text(
                   AppConstants.appName,
                   style: TextStyle(
@@ -90,7 +101,7 @@ class _SplashScreenState extends State<SplashScreen>
                     height: 1.0,
                   ),
                 ),
-                SizedBox(height: 6),
+                const SizedBox(height: 6),
                 Text(
                   AppConstants.appTagline.toUpperCase(),
                   style: TextStyle(
@@ -100,8 +111,7 @@ class _SplashScreenState extends State<SplashScreen>
                     letterSpacing: 3.0,
                   ),
                 ),
-                SizedBox(height: 48),
-                // Loading dots
+                const SizedBox(height: 48),
                 _LoadingDots(),
               ],
             ),
@@ -110,7 +120,7 @@ class _SplashScreenState extends State<SplashScreen>
       ),
       bottomNavigationBar: SafeArea(
         child: Padding(
-          padding: EdgeInsets.only(bottom: 20),
+          padding: const EdgeInsets.only(bottom: 20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -123,7 +133,7 @@ class _SplashScreenState extends State<SplashScreen>
                   letterSpacing: 0.5,
                 ),
               ),
-              SizedBox(height: 2),
+              const SizedBox(height: 2),
               Text(
                 AppConstants.appSlogan,
                 style: TextStyle(
@@ -182,7 +192,8 @@ class _LoadingDotsState extends State<_LoadingDots>
               height: 5,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.primary.withValues(alpha: opacity.clamp(0.15, 1.0)),
+                color: AppColors.primary
+                    .withValues(alpha: opacity.clamp(0.15, 1.0)),
               ),
             );
           }),

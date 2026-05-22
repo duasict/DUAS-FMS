@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import '../../models/user_profile.dart';
@@ -16,50 +17,46 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   late final TextEditingController _nameCtrl;
-  late final TextEditingController _rankCtrl;
   late final TextEditingController _emailCtrl;
   late final TextEditingController _unitCtrl;
   late final TextEditingController _licenseCtrl;
   late final TextEditingController _phoneCtrl;
 
+  String _role = 'rpic';
+  String? _licenseExpiryDate; // ISO date string
   String? _photoPath;
   bool _isSaving = false;
   bool _isDirty = false;
+
+  static const _roles = [
+    ('crp', 'Chief Remote Pilot', Icons.stars_outlined),
+    ('rpic', 'Remote Pilot in Command', Icons.flight_takeoff_outlined),
+    ('vo', 'Visual Observer', Icons.visibility_outlined),
+    ('gcs', 'GCS Operator', Icons.settings_remote_outlined),
+    ('tech', 'Technician', Icons.build_outlined),
+  ];
 
   @override
   void initState() {
     super.initState();
     final p = context.read<UserProfileProvider>().profile;
     _nameCtrl = TextEditingController(text: p.name);
-    _rankCtrl = TextEditingController(text: p.rank);
     _emailCtrl = TextEditingController(text: p.email);
     _unitCtrl = TextEditingController(text: p.unit);
     _licenseCtrl = TextEditingController(text: p.licenseNumber);
     _phoneCtrl = TextEditingController(text: p.phone);
+    _role = p.role;
+    _licenseExpiryDate = p.licenseExpiryDate;
     _photoPath = p.photoPath;
 
-    for (final c in [
-      _nameCtrl,
-      _rankCtrl,
-      _emailCtrl,
-      _unitCtrl,
-      _licenseCtrl,
-      _phoneCtrl
-    ]) {
+    for (final c in [_nameCtrl, _emailCtrl, _unitCtrl, _licenseCtrl, _phoneCtrl]) {
       c.addListener(() => setState(() => _isDirty = true));
     }
   }
 
   @override
   void dispose() {
-    for (final c in [
-      _nameCtrl,
-      _rankCtrl,
-      _emailCtrl,
-      _unitCtrl,
-      _licenseCtrl,
-      _phoneCtrl
-    ]) {
+    for (final c in [_nameCtrl, _emailCtrl, _unitCtrl, _licenseCtrl, _phoneCtrl]) {
       c.dispose();
     }
     super.dispose();
@@ -100,15 +97,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 16),
           ListTile(
-            leading: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(Icons.photo_camera_outlined,
-                  color: AppColors.primary, size: 20),
-            ),
+            leading: _sheetIcon(Icons.photo_camera_outlined, AppColors.primary),
             title: Text('Take Photo',
                 style: TextStyle(
                     color: context.colors.textPrimary,
@@ -116,15 +105,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onTap: () => _pickPhoto(ImageSource.camera),
           ),
           ListTile(
-            leading: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(Icons.photo_library_outlined,
-                  color: AppColors.primary, size: 20),
-            ),
+            leading: _sheetIcon(Icons.photo_library_outlined, AppColors.primary),
             title: Text('Choose from Gallery',
                 style: TextStyle(
                     color: context.colors.textPrimary,
@@ -133,15 +114,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           if (_photoPath != null)
             ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppColors.danger.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.delete_outline,
-                    color: AppColors.danger, size: 20),
-              ),
+              leading: _sheetIcon(Icons.delete_outline, AppColors.danger),
               title: Text('Remove Photo',
                   style: TextStyle(
                       color: AppColors.danger, fontWeight: FontWeight.w500)),
@@ -159,6 +132,46 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Widget _sheetIcon(IconData icon, Color color) => Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(icon, color: color, size: 20),
+      );
+
+  Future<void> _pickExpiryDate() async {
+    final initial = _licenseExpiryDate != null
+        ? DateTime.tryParse(_licenseExpiryDate!) ?? DateTime.now()
+        : DateTime.now();
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2099),
+      helpText: 'License Expiry Date',
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: ColorScheme.dark(
+            primary: AppColors.primary,
+            surface: context.colors.card,
+            onSurface: context.colors.textPrimary,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+
+    if (picked != null) {
+      setState(() {
+        _licenseExpiryDate = DateFormat('yyyy-MM-dd').format(picked);
+        _isDirty = true;
+      });
+    }
+  }
+
   Future<void> _save() async {
     if (_nameCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -168,15 +181,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
     setState(() => _isSaving = true);
 
+    final existing = context.read<UserProfileProvider>().profile;
     final updated = UserProfile(
-      id: context.read<UserProfileProvider>().profile.id,
+      id: existing.id,
+      supabaseId: existing.supabaseId,
       name: _nameCtrl.text.trim(),
-      rank: _rankCtrl.text.trim(),
+      role: _role,
       email: _emailCtrl.text.trim(),
       unit: _unitCtrl.text.trim(),
       licenseNumber: _licenseCtrl.text.trim(),
+      licenseExpiryDate: _licenseExpiryDate,
       phone: _phoneCtrl.text.trim(),
       photoPath: _photoPath,
+      organizationId: existing.organizationId,
     );
 
     await context.read<UserProfileProvider>().update(updated);
@@ -217,6 +234,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           _avatarSection(),
           const SizedBox(height: 28),
+
           _sectionLabel('PERSONAL INFORMATION'),
           const SizedBox(height: 10),
           _field(
@@ -224,13 +242,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             label: 'Full Name',
             hint: 'e.g. Juan B. dela Cruz',
             icon: Icons.person_outline,
-          ),
-          const SizedBox(height: 14),
-          _field(
-            controller: _rankCtrl,
-            label: 'Rank / Title',
-            hint: 'e.g. Captain, 1Lt., Major',
-            icon: Icons.military_tech_outlined,
           ),
           const SizedBox(height: 14),
           _field(
@@ -249,15 +260,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
             keyboardType: TextInputType.phone,
           ),
           const SizedBox(height: 28),
-          _sectionLabel('UNIT & CERTIFICATION'),
+
+          _sectionLabel('ROLE & UNIT'),
           const SizedBox(height: 10),
+          _roleSelector(),
+          const SizedBox(height: 14),
           _field(
             controller: _unitCtrl,
             label: 'Unit / Organization',
             hint: 'e.g. UAS Operations Unit, 1st Aviation Bn',
             icon: Icons.business_outlined,
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 28),
+
+          _sectionLabel('CERTIFICATION'),
+          const SizedBox(height: 10),
           _field(
             controller: _licenseCtrl,
             label: 'UAS License Number',
@@ -265,6 +282,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             icon: Icons.badge_outlined,
             highlighted: true,
           ),
+          const SizedBox(height: 14),
+          _expiryDateField(),
+
           const SizedBox(height: 36),
           SizedBox(
             width: double.infinity,
@@ -283,8 +303,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ? const SizedBox(
                       width: 20,
                       height: 20,
-                      child:
-                          CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
                   : const Text('Save Changes',
                       style:
                           TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
@@ -337,6 +357,158 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _roleSelector() {
+    return Container(
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: context.colors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
+            child: Row(children: [
+              Icon(Icons.badge_outlined,
+                  size: 16, color: context.colors.textMuted),
+              const SizedBox(width: 8),
+              Text(
+                'Role',
+                style: TextStyle(
+                    color: context.colors.textMuted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500),
+              ),
+            ]),
+          ),
+          const Divider(height: 1),
+          ...List.generate(_roles.length, (i) {
+            final (code, label, icon) = _roles[i];
+            final selected = _role == code;
+            return InkWell(
+              onTap: () => setState(() {
+                _role = code;
+                _isDirty = true;
+              }),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? AppColors.primary.withValues(alpha: 0.08)
+                      : Colors.transparent,
+                  border: i < _roles.length - 1
+                      ? Border(
+                          bottom: BorderSide(
+                              color: context.colors.border, width: 0.5))
+                      : null,
+                  borderRadius: i == _roles.length - 1
+                      ? const BorderRadius.vertical(bottom: Radius.circular(10))
+                      : null,
+                ),
+                child: Row(children: [
+                  Icon(icon,
+                      size: 16,
+                      color: selected
+                          ? AppColors.primary
+                          : context.colors.textMuted),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                          color: selected
+                              ? AppColors.primary
+                              : context.colors.textPrimary,
+                          fontSize: 13,
+                          fontWeight: selected
+                              ? FontWeight.w600
+                              : FontWeight.normal),
+                    ),
+                  ),
+                  if (selected)
+                    const Icon(Icons.check_circle,
+                        color: AppColors.primary, size: 16),
+                ]),
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _expiryDateField() {
+    final hasDate = _licenseExpiryDate != null && _licenseExpiryDate!.isNotEmpty;
+    String displayText = 'Tap to select expiry date';
+    Color textColor = context.colors.textMuted;
+
+    if (hasDate) {
+      try {
+        final dt = DateTime.parse(_licenseExpiryDate!);
+        displayText = DateFormat('dd MMMM yyyy').format(dt);
+        final daysLeft = dt.difference(DateTime.now()).inDays;
+        if (daysLeft < 0) {
+          textColor = AppColors.danger;
+          displayText += '  ·  EXPIRED';
+        } else if (daysLeft <= 30) {
+          textColor = AppColors.warning;
+          displayText += '  ·  ${daysLeft}d left';
+        } else {
+          textColor = context.colors.textPrimary;
+        }
+      } catch (_) {
+        displayText = _licenseExpiryDate!;
+        textColor = context.colors.textPrimary;
+      }
+    }
+
+    return GestureDetector(
+      onTap: _pickExpiryDate,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.accent.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.accent.withValues(alpha: 0.4)),
+        ),
+        child: Row(children: [
+          Icon(Icons.event_outlined, size: 18, color: AppColors.accent),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'License Expiry Date',
+                  style: TextStyle(
+                      color: AppColors.accent,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 2),
+                Text(displayText,
+                    style: TextStyle(color: textColor, fontSize: 14)),
+              ],
+            ),
+          ),
+          if (hasDate)
+            GestureDetector(
+              onTap: () => setState(() {
+                _licenseExpiryDate = null;
+                _isDirty = true;
+              }),
+              child: Icon(Icons.close,
+                  size: 16, color: context.colors.textMuted),
+            )
+          else
+            Icon(Icons.chevron_right, size: 18, color: context.colors.textMuted),
+        ]),
       ),
     );
   }

@@ -5,7 +5,7 @@ import '../models/user_profile.dart';
 class UserProfileProvider extends ChangeNotifier {
   UserProfile _profile = const UserProfile(
     name: 'Capt. Juan B. dela Cruz',
-    rank: 'Captain',
+    role: 'rpic',
     email: 'jbdelacruz@uasfms.mil',
     unit: 'UAS Operations Unit',
     licenseNumber: '',

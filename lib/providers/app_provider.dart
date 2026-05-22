@@ -31,7 +31,7 @@ class AppProvider extends ChangeNotifier {
   bool get hasUnsyncedData => _unsyncedCount > 0;
 
   List<Mission> get upcomingMissions => _missions
-      .where((m) => m.status == 'approved' || m.status == 'in_progress')
+      .where((m) => m.status == 'planning' || m.status == 'in_progress')
       .toList()
     ..sort((a, b) => a.date.compareTo(b.date));
 

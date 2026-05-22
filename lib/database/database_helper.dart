@@ -13,7 +13,7 @@ import '../utils/app_constants.dart';
 
 class DatabaseHelper {
   static const _dbName = 'uas_fms.db';
-  static const _dbVersion = 4;
+  static const _dbVersion = 5;
 
   DatabaseHelper._();
   static final DatabaseHelper instance = DatabaseHelper._();
@@ -37,24 +37,6 @@ class DatabaseHelper {
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 4) {
-      await db.execute(
-          "ALTER TABLE aircraft ADD COLUMN serial_number TEXT NOT NULL DEFAULT ''");
-    }
-    if (oldVersion < 3) {
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS user_profile (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT NOT NULL DEFAULT '',
-          rank TEXT NOT NULL DEFAULT '',
-          email TEXT NOT NULL DEFAULT '',
-          unit TEXT NOT NULL DEFAULT '',
-          license_number TEXT NOT NULL DEFAULT '',
-          phone TEXT NOT NULL DEFAULT '',
-          photo_path TEXT DEFAULT ''
-        )
-      ''');
-    }
     if (oldVersion < 2) {
       for (final col in [
         'has_flight_plan_complete INTEGER DEFAULT 0',
@@ -107,6 +89,117 @@ class DatabaseHelper {
         )
       ''');
     }
+    if (oldVersion < 3) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS user_profile (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL DEFAULT '',
+          rank TEXT NOT NULL DEFAULT '',
+          email TEXT NOT NULL DEFAULT '',
+          unit TEXT NOT NULL DEFAULT '',
+          license_number TEXT NOT NULL DEFAULT '',
+          phone TEXT NOT NULL DEFAULT '',
+          photo_path TEXT DEFAULT ''
+        )
+      ''');
+    }
+    if (oldVersion < 4) {
+      await db.execute(
+          "ALTER TABLE aircraft ADD COLUMN serial_number TEXT NOT NULL DEFAULT ''");
+    }
+    if (oldVersion < 5) {
+      // ── user_profile: add role, license_expiry_date, organization_id, supabase_id
+      await db.execute(
+          "ALTER TABLE user_profile ADD COLUMN role TEXT NOT NULL DEFAULT 'rpic'");
+      await db.execute(
+          "ALTER TABLE user_profile ADD COLUMN license_expiry_date TEXT NOT NULL DEFAULT ''");
+      await db.execute(
+          "ALTER TABLE user_profile ADD COLUMN organization_id TEXT NOT NULL DEFAULT ''");
+      await db.execute(
+          "ALTER TABLE user_profile ADD COLUMN supabase_id TEXT NOT NULL DEFAULT ''");
+
+      // ── missions: add crp_advisory_notes, crp_concurrence_required, organization_id, created_by
+      await db.execute(
+          "ALTER TABLE missions ADD COLUMN crp_advisory_notes TEXT NOT NULL DEFAULT ''");
+      await db.execute(
+          "ALTER TABLE missions ADD COLUMN crp_concurrence_required INTEGER NOT NULL DEFAULT 0");
+      await db.execute(
+          "ALTER TABLE missions ADD COLUMN organization_id TEXT NOT NULL DEFAULT ''");
+      await db.execute(
+          "ALTER TABLE missions ADD COLUMN created_by TEXT");
+
+      // Migrate legacy 'approved' status → 'planning'
+      await db.execute(
+          "UPDATE missions SET status = 'planning' WHERE status = 'approved'");
+
+      // ── checklist_items: add item_type for contingency differentiation
+      await db.execute(
+          "ALTER TABLE checklist_items ADD COLUMN item_type TEXT NOT NULL DEFAULT 'standard'");
+
+      // ── New tables: maintenance_logs, battery_logs, incident_reports
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS maintenance_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          aircraft_id INTEGER,
+          mission_id INTEGER,
+          technician_id INTEGER,
+          maintenance_date TEXT NOT NULL,
+          maintenance_type TEXT NOT NULL DEFAULT 'scheduled',
+          description TEXT NOT NULL DEFAULT '',
+          parts_replaced TEXT NOT NULL DEFAULT '',
+          flight_hours REAL,
+          cycle_count INTEGER,
+          next_maintenance_date TEXT,
+          next_maintenance_hours REAL,
+          airworthiness_status TEXT NOT NULL DEFAULT 'serviceable',
+          signed_by TEXT NOT NULL DEFAULT '',
+          remarks TEXT NOT NULL DEFAULT '',
+          organization_id TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL,
+          is_synced INTEGER DEFAULT 0
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS battery_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          aircraft_id INTEGER,
+          mission_id INTEGER,
+          battery_id TEXT NOT NULL,
+          log_date TEXT NOT NULL,
+          charge_cycles INTEGER,
+          voltage_before REAL,
+          voltage_after REAL,
+          charge_time_min INTEGER,
+          status TEXT NOT NULL DEFAULT 'good',
+          remarks TEXT NOT NULL DEFAULT '',
+          organization_id TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL,
+          is_synced INTEGER DEFAULT 0
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS incident_reports (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          mission_id INTEGER,
+          aircraft_id INTEGER,
+          reporter_id INTEGER,
+          incident_date TEXT NOT NULL,
+          incident_time TEXT,
+          location TEXT NOT NULL DEFAULT '',
+          incident_type TEXT NOT NULL DEFAULT '',
+          severity TEXT NOT NULL DEFAULT 'minor',
+          description TEXT NOT NULL DEFAULT '',
+          immediate_actions TEXT NOT NULL DEFAULT '',
+          five_whys TEXT NOT NULL DEFAULT '',
+          corrective_actions TEXT NOT NULL DEFAULT '',
+          reported_to_caap INTEGER NOT NULL DEFAULT 0,
+          caap_reference TEXT,
+          organization_id TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL,
+          is_synced INTEGER DEFAULT 0
+        )
+      ''');
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -115,7 +208,7 @@ class DatabaseHelper {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         mission_id TEXT NOT NULL,
         title TEXT NOT NULL,
-        status TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'planning',
         date TEXT NOT NULL,
         time_str TEXT NOT NULL,
         location TEXT NOT NULL,
@@ -126,13 +219,13 @@ class DatabaseHelper {
         aircraft_id INTEGER,
         aircraft_name TEXT NOT NULL,
         aircraft_type TEXT NOT NULL,
-        hazard_risk TEXT NOT NULL,
-        risk_level TEXT NOT NULL,
-        approved_by TEXT NOT NULL,
         duration INTEGER,
+        crp_advisory_notes TEXT NOT NULL DEFAULT '',
+        crp_concurrence_required INTEGER NOT NULL DEFAULT 0,
+        organization_id TEXT NOT NULL DEFAULT '',
+        created_by TEXT,
         has_flight_plan_complete INTEGER DEFAULT 0,
         has_hira_complete INTEGER DEFAULT 0,
-        has_approval_complete INTEGER DEFAULT 0,
         has_equipment_complete INTEGER DEFAULT 0,
         has_fit_to_fly_complete INTEGER DEFAULT 0,
         has_preflight_complete INTEGER DEFAULT 0,
@@ -185,6 +278,7 @@ class DatabaseHelper {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         mission_id INTEGER NOT NULL,
         checklist_type TEXT NOT NULL,
+        item_type TEXT NOT NULL DEFAULT 'standard',
         section TEXT NOT NULL,
         item_index INTEGER NOT NULL,
         item_text TEXT NOT NULL,
@@ -274,13 +368,81 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE user_profile (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        supabase_id TEXT NOT NULL DEFAULT '',
         name TEXT NOT NULL DEFAULT '',
-        rank TEXT NOT NULL DEFAULT '',
+        role TEXT NOT NULL DEFAULT 'rpic',
         email TEXT NOT NULL DEFAULT '',
         unit TEXT NOT NULL DEFAULT '',
         license_number TEXT NOT NULL DEFAULT '',
+        license_expiry_date TEXT NOT NULL DEFAULT '',
         phone TEXT NOT NULL DEFAULT '',
-        photo_path TEXT DEFAULT ''
+        photo_path TEXT DEFAULT '',
+        organization_id TEXT NOT NULL DEFAULT ''
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE maintenance_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        aircraft_id INTEGER,
+        mission_id INTEGER,
+        technician_id INTEGER,
+        maintenance_date TEXT NOT NULL,
+        maintenance_type TEXT NOT NULL DEFAULT 'scheduled',
+        description TEXT NOT NULL DEFAULT '',
+        parts_replaced TEXT NOT NULL DEFAULT '',
+        flight_hours REAL,
+        cycle_count INTEGER,
+        next_maintenance_date TEXT,
+        next_maintenance_hours REAL,
+        airworthiness_status TEXT NOT NULL DEFAULT 'serviceable',
+        signed_by TEXT NOT NULL DEFAULT '',
+        remarks TEXT NOT NULL DEFAULT '',
+        organization_id TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        is_synced INTEGER DEFAULT 0
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE battery_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        aircraft_id INTEGER,
+        mission_id INTEGER,
+        battery_id TEXT NOT NULL,
+        log_date TEXT NOT NULL,
+        charge_cycles INTEGER,
+        voltage_before REAL,
+        voltage_after REAL,
+        charge_time_min INTEGER,
+        status TEXT NOT NULL DEFAULT 'good',
+        remarks TEXT NOT NULL DEFAULT '',
+        organization_id TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        is_synced INTEGER DEFAULT 0
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE incident_reports (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        mission_id INTEGER,
+        aircraft_id INTEGER,
+        reporter_id INTEGER,
+        incident_date TEXT NOT NULL,
+        incident_time TEXT,
+        location TEXT NOT NULL DEFAULT '',
+        incident_type TEXT NOT NULL DEFAULT '',
+        severity TEXT NOT NULL DEFAULT 'minor',
+        description TEXT NOT NULL DEFAULT '',
+        immediate_actions TEXT NOT NULL DEFAULT '',
+        five_whys TEXT NOT NULL DEFAULT '',
+        corrective_actions TEXT NOT NULL DEFAULT '',
+        reported_to_caap INTEGER NOT NULL DEFAULT 0,
+        caap_reference TEXT,
+        organization_id TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        is_synced INTEGER DEFAULT 0
       )
     ''');
 
@@ -327,10 +489,8 @@ class DatabaseHelper {
       'aircraft_id': 1,
       'aircraft_name': 'DJI Agras T40',
       'aircraft_type': 'multi-rotor',
-      'hazard_risk':
-          'Low terrain complexity. No restricted airspace. Minimal population exposure. Controlled agricultural environment.',
-      'risk_level': 'low',
-      'approved_by': 'Col. Ramon A. Reyes',
+      'crp_advisory_notes': '',
+      'crp_concurrence_required': 0,
       'duration': 145,
       'has_preflight_complete': 1,
       'has_inflight_complete': 1,
@@ -340,16 +500,16 @@ class DatabaseHelper {
       'created_at': '2025-04-01T08:00:00',
     });
     await _seedCrew(db, m1, [
-      {'name': 'Capt. Juan B. dela Cruz', 'role': 'RPIC'},
-      {'name': 'SSgt. Maria L. Santos', 'role': 'VO'},
-      {'name': 'Cpl. Pedro G. Reyes', 'role': 'Tech'},
+      {'name': 'Capt. Juan B. dela Cruz', 'role': 'rpic'},
+      {'name': 'SSgt. Maria L. Santos', 'role': 'vo'},
+      {'name': 'Cpl. Pedro G. Reyes', 'role': 'tech'},
     ]);
 
-    // Mission 2 — Approved (upcoming)
+    // Mission 2 — Planning (upcoming)
     final m2 = await db.insert('missions', {
       'mission_id': 'UAS-2025-002',
       'title': 'Infrastructure Inspection — NLEX Viaduct',
-      'status': 'approved',
+      'status': 'planning',
       'date': '2025-05-10',
       'time_str': '07:00',
       'location': 'NLEX Viaduct, Bulacan',
@@ -361,29 +521,24 @@ class DatabaseHelper {
       'aircraft_id': 2,
       'aircraft_name': 'DJI Matrice 350 RTK',
       'aircraft_type': 'multi-rotor',
-      'hazard_risk':
-          'Moderate urban environment. Proximity to highway traffic. Overhead power lines present. Requires coordination with NLEX Operations Center.',
-      'risk_level': 'medium',
-      'approved_by': 'Maj. Elena V. Santos',
+      'crp_advisory_notes':
+          'Coordinate with NLEX Operations Center. Monitor overhead power lines. Wind limit: ≤10 m/s.',
+      'crp_concurrence_required': 0,
       'duration': null,
-      'has_preflight_complete': 0,
-      'has_inflight_complete': 0,
-      'has_postflight_complete': 0,
-      'has_flightlog_complete': 0,
       'is_synced': 1,
       'created_at': '2025-04-20T09:00:00',
     });
     await _seedCrew(db, m2, [
-      {'name': 'Capt. Juan B. dela Cruz', 'role': 'RPIC'},
-      {'name': 'Sgt. Robert T. Lim', 'role': 'VO'},
-      {'name': 'Cpl. Ana P. Mendoza', 'role': 'Tech'},
+      {'name': 'Capt. Juan B. dela Cruz', 'role': 'rpic'},
+      {'name': 'Sgt. Robert T. Lim', 'role': 'vo'},
+      {'name': 'Cpl. Ana P. Mendoza', 'role': 'tech'},
     ]);
 
-    // Mission 3 — Approved (upcoming)
+    // Mission 3 — Planning / HIGH RISK → CRP concurrence required
     final m3 = await db.insert('missions', {
       'mission_id': 'UAS-2025-003',
       'title': 'Emergency Response — SAR Sierra Madre',
-      'status': 'approved',
+      'status': 'planning',
       'date': '2025-05-12',
       'time_str': '05:30',
       'location': 'Sierra Madre Mountains, Quezon',
@@ -395,29 +550,23 @@ class DatabaseHelper {
       'aircraft_id': 3,
       'aircraft_name': 'WingtraOne GEN II',
       'aircraft_type': 'vtol',
-      'hazard_risk':
-          'High altitude operations. Dense forest canopy. Unpredictable mountain weather. Limited landing zones. RTH altitude set to 250 m AGL.',
-      'risk_level': 'high',
-      'approved_by': 'Brig. Gen. Armando C. Cruz',
+      'crp_advisory_notes': '',
+      'crp_concurrence_required': 1,
       'duration': null,
-      'has_preflight_complete': 0,
-      'has_inflight_complete': 0,
-      'has_postflight_complete': 0,
-      'has_flightlog_complete': 0,
       'is_synced': 1,
       'created_at': '2025-05-01T14:00:00',
     });
     await _seedCrew(db, m3, [
-      {'name': 'Capt. Juan B. dela Cruz', 'role': 'RPIC'},
-      {'name': 'SSgt. Maria L. Santos', 'role': 'VO'},
-      {'name': 'Cpl. Pedro G. Reyes', 'role': 'Tech'},
+      {'name': 'Capt. Juan B. dela Cruz', 'role': 'rpic'},
+      {'name': 'SSgt. Maria L. Santos', 'role': 'vo'},
+      {'name': 'Cpl. Pedro G. Reyes', 'role': 'tech'},
     ]);
 
-    // Mission 4 — Approved (upcoming)
+    // Mission 4 — Planning (upcoming)
     final m4 = await db.insert('missions', {
       'mission_id': 'UAS-2025-004',
       'title': 'Coastal LiDAR Survey — Manila Bay',
-      'status': 'approved',
+      'status': 'planning',
       'date': '2025-05-15',
       'time_str': '06:00',
       'location': 'Manila Bay Coastline, Metro Manila',
@@ -429,22 +578,17 @@ class DatabaseHelper {
       'aircraft_id': 3,
       'aircraft_name': 'WingtraOne GEN II',
       'aircraft_type': 'vtol',
-      'hazard_risk':
-          'High sea-wind variability. Proximity to Manila NAIA restricted airspace. Coordination with CAAP required. Salt-air corrosion risk to payload.',
-      'risk_level': 'medium',
-      'approved_by': 'Maj. Elena V. Santos',
+      'crp_advisory_notes':
+          'CAAP coordination required. Monitor NAIA TFR. Salt-air post-flight rinse for LiDAR payload.',
+      'crp_concurrence_required': 0,
       'duration': null,
-      'has_preflight_complete': 0,
-      'has_inflight_complete': 0,
-      'has_postflight_complete': 0,
-      'has_flightlog_complete': 0,
       'is_synced': 1,
       'created_at': '2025-04-25T10:00:00',
     });
     await _seedCrew(db, m4, [
-      {'name': 'Lt. Carlos M. Reyes', 'role': 'RPIC'},
-      {'name': 'Sgt. Robert T. Lim', 'role': 'VO'},
-      {'name': 'Cpl. Ana P. Mendoza', 'role': 'Tech'},
+      {'name': 'Lt. Carlos M. Reyes', 'role': 'rpic'},
+      {'name': 'Sgt. Robert T. Lim', 'role': 'vo'},
+      {'name': 'Cpl. Ana P. Mendoza', 'role': 'tech'},
     ]);
 
     // Alerts
