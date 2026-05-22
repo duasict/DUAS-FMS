@@ -30,17 +30,31 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   email               TEXT NOT NULL DEFAULT '',
   phone               TEXT NOT NULL DEFAULT '',
   photo_url           TEXT,
-  role                TEXT NOT NULL DEFAULT 'rpic'
-                        CHECK (role IN ('crp', 'rpic', 'vo', 'gcs', 'tech')),
+  -- Profile roles:
+  --   crp  = Chief Remote Pilot (org-level admin, assigned by CRP or admin)
+  --   pic  = Person in Command (auto-granted when CAAP license verified + non-expired)
+  --   vo   = Visual Observer
+  --   gcs  = GCS Operator
+  --   tech = Technician
+  -- NOTE: 'rpic' (Remote Pilot in Command) is a MISSION-SPECIFIC crew role only.
+  --       It is NOT a profile-level role. Only users with role='pic' may be
+  --       assigned as RPIC on a mission.
+  role                TEXT NOT NULL DEFAULT 'vo'
+                        CHECK (role IN ('crp', 'pic', 'vo', 'gcs', 'tech')),
   unit                TEXT NOT NULL DEFAULT '',
   license_number      TEXT NOT NULL DEFAULT '',
   license_expiry_date DATE,
+  -- License verification (populated via in-app ID card OCR scan — not manual entry)
+  license_verified    BOOLEAN NOT NULL DEFAULT FALSE,
+  face_verified       BOOLEAN NOT NULL DEFAULT FALSE,
   organization_id     UUID REFERENCES public.organizations(id),
   created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-COMMENT ON TABLE public.profiles IS 'User profiles. roles: crp=Chief Remote Pilot, rpic=Remote Pilot in Command, vo=Visual Observer, gcs=GCS Operator, tech=Technician';
-COMMENT ON COLUMN public.profiles.role IS 'crp | rpic | vo | gcs | tech';
+COMMENT ON TABLE public.profiles IS 'User profiles. Profile roles: crp | pic | vo | gcs | tech. Mission crew role ''rpic'' is separate and mission-specific.';
+COMMENT ON COLUMN public.profiles.role IS 'crp=Chief Remote Pilot | pic=Person in Command (license verified) | vo | gcs | tech';
+COMMENT ON COLUMN public.profiles.license_verified IS 'TRUE only after in-app CAAP ID card OCR scan. Cannot be set manually.';
+COMMENT ON COLUMN public.profiles.face_verified IS 'TRUE when selfie matched ID photo during license verification.';
 
 -- Auto-create profile row when a new Supabase Auth user is created
 CREATE OR REPLACE FUNCTION public.handle_new_user()

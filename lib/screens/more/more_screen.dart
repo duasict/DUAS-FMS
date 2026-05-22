@@ -1,10 +1,12 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../models/user_profile.dart';
 import '../../providers/user_profile_provider.dart';
 import '../../services/supabase_service.dart';
 import '../../theme/app_theme.dart';
 import '../aircraft/aircraft_screen.dart';
+import '../license/license_verification_screen.dart';
 import '../login_screen.dart';
 import 'profile_screen.dart';
 import 'settings_screen.dart';
@@ -97,12 +99,7 @@ class MoreScreen extends StatelessWidget {
             onTap: () => Navigator.push(context,
                 MaterialPageRoute(builder: (_) => const ProfileScreen())),
           ),
-          _NavTile(
-            icon: Icons.badge_outlined,
-            title: 'Certifications',
-            subtitle: 'Licenses and qualifications',
-            onTap: () {},
-          ),
+          _LicenseVerificationTile(profile: profile),
           const SizedBox(height: 8),
           const _SectionLabel(label: 'APP'),
           _NavTile(
@@ -296,6 +293,108 @@ class _NavTile extends StatelessWidget {
                 color: context.colors.textMuted, size: 18)
             : null,
         onTap: onTap,
+        dense: true,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      ),
+    );
+  }
+}
+
+// ── License Verification tile — shows dynamic verified/expired/unverified state
+class _LicenseVerificationTile extends StatelessWidget {
+  final UserProfile profile;
+  const _LicenseVerificationTile({required this.profile});
+
+  @override
+  Widget build(BuildContext context) {
+    final verified = profile.licenseVerified;
+    final expired = profile.isLicenseExpired;
+    final expiringSoon = profile.isLicenseExpiringSoon;
+
+    IconData icon;
+    Color iconColor;
+    String subtitle;
+
+    if (verified && !expired) {
+      icon = expiringSoon ? Icons.warning_amber_outlined : Icons.verified_outlined;
+      iconColor = expiringSoon ? AppColors.warning : AppColors.success;
+      subtitle = expiringSoon
+          ? 'License expiring soon — re-verify'
+          : 'Verified · ${profile.licenseNumber}';
+    } else if (verified && expired) {
+      icon = Icons.error_outline;
+      iconColor = AppColors.danger;
+      subtitle = 'License EXPIRED — re-verify to restore PIC status';
+    } else {
+      icon = Icons.badge_outlined;
+      iconColor = AppColors.primaryLight;
+      subtitle = 'Scan your CAAP license to receive PIC status';
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 3),
+      decoration: BoxDecoration(
+        color: context.colors.card,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: verified && !expired
+              ? expiringSoon
+                  ? AppColors.warning.withValues(alpha: 0.4)
+                  : AppColors.success.withValues(alpha: 0.3)
+              : verified && expired
+                  ? AppColors.danger.withValues(alpha: 0.4)
+                  : context.colors.border,
+        ),
+      ),
+      child: ListTile(
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: iconColor.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: iconColor, size: 18),
+        ),
+        title: Text(
+          'License Verification',
+          style: TextStyle(
+              color: context.colors.textPrimary,
+              fontSize: 14,
+              fontWeight: FontWeight.w500),
+        ),
+        subtitle: Text(subtitle,
+            style: TextStyle(
+                color: verified && expired
+                    ? AppColors.danger
+                    : expiringSoon
+                        ? AppColors.warning
+                        : context.colors.textMuted,
+                fontSize: 11)),
+        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+          if (verified && !expired && !expiringSoon)
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: AppColors.success.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Text('PIC',
+                  style: TextStyle(
+                      color: AppColors.success,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800)),
+            ),
+          const SizedBox(width: 4),
+          Icon(Icons.chevron_right,
+              color: context.colors.textMuted, size: 18),
+        ]),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (_) => const LicenseVerificationScreen()),
+        ),
         dense: true,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 14, vertical: 4),

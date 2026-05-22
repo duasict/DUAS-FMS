@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../models/user_profile.dart';
 import '../../providers/user_profile_provider.dart';
 import '../../theme/app_theme.dart';
+import '../license/license_verification_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -19,48 +20,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _emailCtrl;
   late final TextEditingController _unitCtrl;
-  late final TextEditingController _licenseCtrl;
   late final TextEditingController _phoneCtrl;
 
-  String _role = 'rpic';
-  String? _licenseExpiryDate; // ISO date string
+  String _role = 'vo';
   String? _photoPath;
   bool _isSaving = false;
   bool _isDirty = false;
 
-  static const _roles = [
-    ('crp', 'Chief Remote Pilot', Icons.stars_outlined),
-    ('rpic', 'Remote Pilot in Command', Icons.flight_takeoff_outlined),
-    ('vo', 'Visual Observer', Icons.visibility_outlined),
-    ('gcs', 'GCS Operator', Icons.settings_remote_outlined),
-    ('tech', 'Technician', Icons.build_outlined),
+  // Roles the user can manually select. 'pic' is auto-assigned by license
+  // verification; 'crp' is admin-assigned — neither appears here as a tap target.
+  static const _selectableRoles = [
+    ('vo',   'Visual Observer',  Icons.visibility_outlined),
+    ('gcs',  'GCS Operator',     Icons.settings_remote_outlined),
+    ('tech', 'Technician',       Icons.build_outlined),
   ];
 
   @override
   void initState() {
     super.initState();
     final p = context.read<UserProfileProvider>().profile;
-    _nameCtrl = TextEditingController(text: p.name);
+    _nameCtrl  = TextEditingController(text: p.name);
     _emailCtrl = TextEditingController(text: p.email);
-    _unitCtrl = TextEditingController(text: p.unit);
-    _licenseCtrl = TextEditingController(text: p.licenseNumber);
+    _unitCtrl  = TextEditingController(text: p.unit);
     _phoneCtrl = TextEditingController(text: p.phone);
-    _role = p.role;
-    _licenseExpiryDate = p.licenseExpiryDate;
+    // Only set a selectable role; crp/pic kept as-is
+    _role      = p.role;
     _photoPath = p.photoPath;
 
-    for (final c in [_nameCtrl, _emailCtrl, _unitCtrl, _licenseCtrl, _phoneCtrl]) {
+    for (final c in [_nameCtrl, _emailCtrl, _unitCtrl, _phoneCtrl]) {
       c.addListener(() => setState(() => _isDirty = true));
     }
   }
 
   @override
   void dispose() {
-    for (final c in [_nameCtrl, _emailCtrl, _unitCtrl, _licenseCtrl, _phoneCtrl]) {
+    for (final c in [_nameCtrl, _emailCtrl, _unitCtrl, _phoneCtrl]) {
       c.dispose();
     }
     super.dispose();
   }
+
+  // ── Photo ──────────────────────────────────────────────────────────────────
 
   Future<void> _pickPhoto(ImageSource source) async {
     Navigator.pop(context);
@@ -68,13 +68,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final picked = await picker.pickImage(source: source, imageQuality: 85);
     if (picked == null) return;
 
-    final dir = await getApplicationDocumentsDirectory();
+    final dir  = await getApplicationDocumentsDirectory();
     final dest = File('${dir.path}/profile_photo.jpg');
     await File(picked.path).copy(dest.path);
 
     setState(() {
       _photoPath = dest.path;
-      _isDirty = true;
+      _isDirty   = true;
     });
   }
 
@@ -88,8 +88,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           const SizedBox(height: 8),
           Container(
-            width: 36,
-            height: 4,
+            width: 36, height: 4,
             decoration: BoxDecoration(
               color: context.colors.border,
               borderRadius: BorderRadius.circular(2),
@@ -122,7 +121,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Navigator.pop(context);
                 setState(() {
                   _photoPath = null;
-                  _isDirty = true;
+                  _isDirty   = true;
                 });
               },
             ),
@@ -141,36 +140,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Icon(icon, color: color, size: 20),
       );
 
-  Future<void> _pickExpiryDate() async {
-    final initial = _licenseExpiryDate != null
-        ? DateTime.tryParse(_licenseExpiryDate!) ?? DateTime.now()
-        : DateTime.now();
-
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: initial,
-      firstDate: DateTime.now(),
-      lastDate: DateTime(2099),
-      helpText: 'License Expiry Date',
-      builder: (ctx, child) => Theme(
-        data: Theme.of(ctx).copyWith(
-          colorScheme: ColorScheme.dark(
-            primary: AppColors.primary,
-            surface: context.colors.card,
-            onSurface: context.colors.textPrimary,
-          ),
-        ),
-        child: child!,
-      ),
-    );
-
-    if (picked != null) {
-      setState(() {
-        _licenseExpiryDate = DateFormat('yyyy-MM-dd').format(picked);
-        _isDirty = true;
-      });
-    }
-  }
+  // ── Save ───────────────────────────────────────────────────────────────────
 
   Future<void> _save() async {
     if (_nameCtrl.text.trim().isEmpty) {
@@ -182,18 +152,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() => _isSaving = true);
 
     final existing = context.read<UserProfileProvider>().profile;
-    final updated = UserProfile(
-      id: existing.id,
-      supabaseId: existing.supabaseId,
-      name: _nameCtrl.text.trim(),
-      role: _role,
-      email: _emailCtrl.text.trim(),
-      unit: _unitCtrl.text.trim(),
-      licenseNumber: _licenseCtrl.text.trim(),
-      licenseExpiryDate: _licenseExpiryDate,
-      phone: _phoneCtrl.text.trim(),
-      photoPath: _photoPath,
-      organizationId: existing.organizationId,
+
+    // Preserve license fields — they come only from LicenseVerificationScreen.
+    // Preserve role if CRP or PIC (those are not manually selectable here).
+    final finalRole = (existing.role == 'crp' || existing.role == 'pic')
+        ? existing.role
+        : _role;
+
+    final updated = existing.copyWith(
+      name:          _nameCtrl.text.trim(),
+      role:          finalRole,
+      email:         _emailCtrl.text.trim(),
+      unit:          _unitCtrl.text.trim(),
+      phone:         _phoneCtrl.text.trim(),
+      photoPath:     _photoPath,
+      clearPhoto:    _photoPath == null,
     );
 
     await context.read<UserProfileProvider>().update(updated);
@@ -201,14 +174,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (!mounted) return;
     setState(() {
       _isSaving = false;
-      _isDirty = false;
+      _isDirty  = false;
     });
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('Profile saved.'), backgroundColor: AppColors.success));
   }
 
+  // ── Build ──────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
+    // Watch so the certification card refreshes after returning from verification
+    final profile = context.watch<UserProfileProvider>().profile;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Profile'),
@@ -218,8 +196,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               onPressed: _isSaving ? null : _save,
               child: _isSaving
                   ? const SizedBox(
-                      width: 16,
-                      height: 16,
+                      width: 16, height: 16,
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: AppColors.primary))
                   : const Text('Save',
@@ -235,6 +212,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _avatarSection(),
           const SizedBox(height: 28),
 
+          // ── Personal ────────────────────────────────────────────────────
           _sectionLabel('PERSONAL INFORMATION'),
           const SizedBox(height: 10),
           _field(
@@ -261,9 +239,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 28),
 
+          // ── Role ────────────────────────────────────────────────────────
           _sectionLabel('ROLE & UNIT'),
           const SizedBox(height: 10),
-          _roleSelector(),
+          _roleSelector(profile),
           const SizedBox(height: 14),
           _field(
             controller: _unitCtrl,
@@ -273,19 +252,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 28),
 
-          _sectionLabel('CERTIFICATION'),
+          // ── Certification ────────────────────────────────────────────────
+          _sectionLabel('CAAP LICENSE'),
           const SizedBox(height: 10),
-          _field(
-            controller: _licenseCtrl,
-            label: 'UAS License Number',
-            hint: 'e.g. CAAP-UAS-2024-00123',
-            icon: Icons.badge_outlined,
-            highlighted: true,
-          ),
-          const SizedBox(height: 14),
-          _expiryDateField(),
-
+          _certificationCard(profile),
           const SizedBox(height: 36),
+
           SizedBox(
             width: double.infinity,
             height: 48,
@@ -301,19 +273,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               child: _isSaving
                   ? const SizedBox(
-                      width: 20,
-                      height: 20,
+                      width: 20, height: 20,
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: Colors.white))
                   : const Text('Save Changes',
-                      style:
-                          TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                      style: TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.w600)),
             ),
           ),
         ],
       ),
     );
   }
+
+  // ── Avatar ─────────────────────────────────────────────────────────────────
 
   Widget _avatarSection() {
     return Center(
@@ -323,8 +296,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           GestureDetector(
             onTap: _showPhotoSheet,
             child: Container(
-              width: 100,
-              height: 100,
+              width: 100, height: 100,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: AppColors.primary.withValues(alpha: 0.12),
@@ -333,8 +305,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 image: _photoPath != null
                     ? DecorationImage(
                         image: FileImage(File(_photoPath!)),
-                        fit: BoxFit.cover,
-                      )
+                        fit: BoxFit.cover)
                     : null,
               ),
               child: _photoPath == null
@@ -346,8 +317,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           GestureDetector(
             onTap: _showPhotoSheet,
             child: Container(
-              width: 30,
-              height: 30,
+              width: 30, height: 30,
               decoration: BoxDecoration(
                 color: AppColors.primary,
                 shape: BoxShape.circle,
@@ -361,7 +331,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _roleSelector() {
+  // ── Role selector ──────────────────────────────────────────────────────────
+
+  Widget _roleSelector(UserProfile profile) {
+    final isCrp = profile.role == 'crp';
+    final isPic = profile.role == 'pic';
+
     return Container(
       decoration: BoxDecoration(
         color: context.colors.surface,
@@ -377,65 +352,69 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Icon(Icons.badge_outlined,
                   size: 16, color: context.colors.textMuted),
               const SizedBox(width: 8),
-              Text(
-                'Role',
-                style: TextStyle(
-                    color: context.colors.textMuted,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500),
-              ),
+              Text('Role',
+                  style: TextStyle(
+                      color: context.colors.textMuted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500)),
             ]),
           ),
           const Divider(height: 1),
-          ...List.generate(_roles.length, (i) {
-            final (code, label, icon) = _roles[i];
-            final selected = _role == code;
-            return InkWell(
-              onTap: () => setState(() {
-                _role = code;
-                _isDirty = true;
-              }),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-                decoration: BoxDecoration(
-                  color: selected
-                      ? AppColors.primary.withValues(alpha: 0.08)
-                      : Colors.transparent,
-                  border: i < _roles.length - 1
-                      ? Border(
-                          bottom: BorderSide(
-                              color: context.colors.border, width: 0.5))
-                      : null,
-                  borderRadius: i == _roles.length - 1
-                      ? const BorderRadius.vertical(bottom: Radius.circular(10))
-                      : null,
-                ),
-                child: Row(children: [
-                  Icon(icon,
-                      size: 16,
-                      color: selected
-                          ? AppColors.primary
-                          : context.colors.textMuted),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      label,
-                      style: TextStyle(
-                          color: selected
-                              ? AppColors.primary
-                              : context.colors.textPrimary,
-                          fontSize: 13,
-                          fontWeight: selected
-                              ? FontWeight.w600
-                              : FontWeight.normal),
-                    ),
-                  ),
-                  if (selected)
-                    const Icon(Icons.check_circle,
-                        color: AppColors.primary, size: 16),
-                ]),
+
+          // CRP / PIC — read-only header rows
+          if (isCrp)
+            _roleRow(
+              icon: Icons.stars_outlined,
+              label: 'Chief Remote Pilot',
+              sublabel: 'Assigned by organization — cannot be changed',
+              selected: true,
+              locked: true,
+              isLast: false,
+            ),
+          if (isPic)
+            _roleRow(
+              icon: Icons.verified_outlined,
+              label: 'Person in Command',
+              sublabel: 'Granted via CAAP license verification',
+              selected: true,
+              locked: true,
+              isLast: false,
+            ),
+
+          // PIC hint row — shown when NOT already pic/crp
+          if (!isCrp && !isPic)
+            _roleRow(
+              icon: Icons.lock_outline,
+              label: 'Person in Command',
+              sublabel: 'Scan your CAAP license to unlock',
+              selected: false,
+              locked: true,
+              isLast: false,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const LicenseVerificationScreen()),
               ),
+            ),
+
+          // Selectable roles (only enabled for non-crp / non-pic)
+          ...List.generate(_selectableRoles.length, (i) {
+            final (code, label, icon) = _selectableRoles[i];
+            final isLast = i == _selectableRoles.length - 1;
+            final selected = !isCrp && !isPic && _role == code;
+            final disabled = isCrp || isPic;
+            return _roleRow(
+              icon: icon,
+              label: label,
+              selected: selected,
+              locked: disabled,
+              isLast: isLast,
+              onTap: disabled
+                  ? null
+                  : () => setState(() {
+                        _role    = code;
+                        _isDirty = true;
+                      }),
             );
           }),
         ],
@@ -443,75 +422,232 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _expiryDateField() {
-    final hasDate = _licenseExpiryDate != null && _licenseExpiryDate!.isNotEmpty;
-    String displayText = 'Tap to select expiry date';
-    Color textColor = context.colors.textMuted;
+  Widget _roleRow({
+    required IconData icon,
+    required String label,
+    String? sublabel,
+    required bool selected,
+    required bool locked,
+    required bool isLast,
+    VoidCallback? onTap,
+  }) {
+    final effectiveColor = locked && !selected
+        ? context.colors.textMuted
+        : selected
+            ? AppColors.primary
+            : context.colors.textPrimary;
 
-    if (hasDate) {
-      try {
-        final dt = DateTime.parse(_licenseExpiryDate!);
-        displayText = DateFormat('dd MMMM yyyy').format(dt);
-        final daysLeft = dt.difference(DateTime.now()).inDays;
-        if (daysLeft < 0) {
-          textColor = AppColors.danger;
-          displayText += '  ·  EXPIRED';
-        } else if (daysLeft <= 30) {
-          textColor = AppColors.warning;
-          displayText += '  ·  ${daysLeft}d left';
-        } else {
-          textColor = context.colors.textPrimary;
-        }
-      } catch (_) {
-        displayText = _licenseExpiryDate!;
-        textColor = context.colors.textPrimary;
-      }
-    }
-
-    return GestureDetector(
-      onTap: _pickExpiryDate,
+    return InkWell(
+      onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
         decoration: BoxDecoration(
-          color: AppColors.accent.withValues(alpha: 0.04),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppColors.accent.withValues(alpha: 0.4)),
+          color: selected
+              ? AppColors.primary.withValues(alpha: 0.08)
+              : Colors.transparent,
+          border: !isLast
+              ? Border(
+                  bottom: BorderSide(
+                      color: context.colors.border, width: 0.5))
+              : null,
+          borderRadius: isLast
+              ? const BorderRadius.vertical(bottom: Radius.circular(10))
+              : null,
         ),
         child: Row(children: [
-          Icon(Icons.event_outlined, size: 18, color: AppColors.accent),
+          Icon(icon, size: 16, color: effectiveColor),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'License Expiry Date',
-                  style: TextStyle(
-                      color: AppColors.accent,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500),
-                ),
-                const SizedBox(height: 2),
-                Text(displayText,
-                    style: TextStyle(color: textColor, fontSize: 14)),
+                Text(label,
+                    style: TextStyle(
+                        color: effectiveColor,
+                        fontSize: 13,
+                        fontWeight: selected
+                            ? FontWeight.w600
+                            : FontWeight.normal)),
+                if (sublabel != null)
+                  Text(sublabel,
+                      style: TextStyle(
+                          color: context.colors.textMuted,
+                          fontSize: 10)),
               ],
             ),
           ),
-          if (hasDate)
-            GestureDetector(
-              onTap: () => setState(() {
-                _licenseExpiryDate = null;
-                _isDirty = true;
-              }),
-              child: Icon(Icons.close,
-                  size: 16, color: context.colors.textMuted),
-            )
-          else
-            Icon(Icons.chevron_right, size: 18, color: context.colors.textMuted),
+          if (selected)
+            const Icon(Icons.check_circle, color: AppColors.primary, size: 16),
+          if (locked && !selected && onTap != null)
+            Icon(Icons.chevron_right,
+                color: context.colors.textMuted, size: 16),
         ]),
       ),
     );
   }
+
+  // ── Certification card ─────────────────────────────────────────────────────
+
+  Widget _certificationCard(UserProfile profile) {
+    final verified  = profile.licenseVerified;
+    final expired   = profile.isLicenseExpired;
+    final soonExp   = profile.isLicenseExpiringSoon;
+    final hasLicense = profile.licenseNumber.isNotEmpty;
+
+    Color borderColor;
+    Color iconColor;
+    IconData statusIcon;
+    String statusText;
+
+    if (verified && !expired) {
+      borderColor = soonExp
+          ? AppColors.warning.withValues(alpha: 0.4)
+          : AppColors.success.withValues(alpha: 0.3);
+      iconColor   = soonExp ? AppColors.warning : AppColors.success;
+      statusIcon  = soonExp ? Icons.warning_amber_outlined : Icons.verified_outlined;
+      statusText  = soonExp ? 'Expiring Soon' : 'Verified';
+    } else if (verified && expired) {
+      borderColor = AppColors.danger.withValues(alpha: 0.4);
+      iconColor   = AppColors.danger;
+      statusIcon  = Icons.error_outline;
+      statusText  = 'Expired — Re-verify';
+    } else {
+      borderColor = context.colors.border;
+      iconColor   = context.colors.textMuted;
+      statusIcon  = Icons.badge_outlined;
+      statusText  = 'Not Verified';
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Status row
+          Row(children: [
+            Icon(statusIcon, color: iconColor, size: 16),
+            const SizedBox(width: 6),
+            Text(statusText,
+                style: TextStyle(
+                    color: iconColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700)),
+            const Spacer(),
+            if (profile.faceVerified)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 7, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.success.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(5),
+                ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.face, color: AppColors.success, size: 11),
+                  const SizedBox(width: 3),
+                  const Text('Face',
+                      style: TextStyle(
+                          color: AppColors.success,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700)),
+                ]),
+              ),
+          ]),
+
+          if (hasLicense) ...[
+            const SizedBox(height: 10),
+            const Divider(height: 1),
+            const SizedBox(height: 10),
+            _certRow(Icons.badge_outlined, 'License No.',
+                profile.licenseNumber),
+            if (profile.licenseExpiryDate != null) ...[
+              const SizedBox(height: 6),
+              _certRow(
+                Icons.event_outlined,
+                'Valid Until',
+                _fmtExpiry(profile.licenseExpiryDate!),
+                valueColor: expired
+                    ? AppColors.danger
+                    : soonExp
+                        ? AppColors.warning
+                        : context.colors.textPrimary,
+              ),
+            ],
+          ] else ...[
+            const SizedBox(height: 8),
+            Text(
+              'No license on record. Scan your CAAP Remote Pilot '
+              'Certificate to verify and receive PIC status.',
+              style: TextStyle(
+                  color: context.colors.textSecondary,
+                  fontSize: 12,
+                  height: 1.4),
+            ),
+          ],
+
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            height: 40,
+            child: ElevatedButton.icon(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const LicenseVerificationScreen()),
+              ),
+              icon: const Icon(Icons.document_scanner_outlined, size: 16),
+              label: Text(hasLicense ? 'Re-Verify License' : 'Verify License',
+                  style: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w600)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _certRow(IconData icon, String label, String value,
+      {Color? valueColor}) {
+    return Row(children: [
+      Icon(icon, size: 13, color: context.colors.textMuted),
+      const SizedBox(width: 8),
+      SizedBox(
+          width: 90,
+          child: Text('$label:',
+              style: TextStyle(
+                  color: context.colors.textSecondary, fontSize: 12))),
+      Expanded(
+        child: Text(
+          value,
+          style: TextStyle(
+              color: valueColor ?? context.colors.textPrimary,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              fontFamily: label == 'License No.' ? 'monospace' : null),
+        ),
+      ),
+    ]);
+  }
+
+  String _fmtExpiry(String isoDate) {
+    try {
+      return DateFormat('dd MMM yyyy').format(DateTime.parse(isoDate));
+    } catch (_) {
+      return isoDate;
+    }
+  }
+
+  // ── Shared widgets ─────────────────────────────────────────────────────────
 
   Widget _sectionLabel(String text) => Text(
         text,
@@ -550,7 +686,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+          borderSide:
+              const BorderSide(color: AppColors.primary, width: 1.5),
         ),
         filled: true,
         fillColor: highlighted

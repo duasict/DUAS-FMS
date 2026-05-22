@@ -125,7 +125,7 @@ class _InflightChecklistScreenState extends State<InflightChecklistScreen> {
       appBar: AppBar(
         title: const Text('In-flight Checklist'),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(36),
+          preferredSize: const Size.fromHeight(32),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             child: ChecklistProgressBar(current: 1),

@@ -1,6 +1,14 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  ChecklistProgressBar
+//
+//  Renders a horizontal step-indicator that is overflow-safe for any number
+//  of steps. Each step indicator (circle + label) is wrapped in Flexible so
+//  it can shrink proportionally. The text uses overflow:ellipsis as a last
+//  resort. Dividers between steps use Expanded with a fixed flex weight.
+// ─────────────────────────────────────────────────────────────────────────────
 class ChecklistProgressBar extends StatelessWidget {
   final int current;
   final List<String>? steps;
@@ -11,67 +19,90 @@ class ChecklistProgressBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final stepList = steps ?? _defaultSteps;
+    // Divider flex is intentionally small so steps keep as much width as
+    // possible. Steps use flex:3, dividers flex:1.
     return Row(
       children: List.generate(stepList.length * 2 - 1, (i) {
         if (i.isOdd) {
+          // Connector line — colored green when the step to the left is done
+          final leftDone = (i ~/ 2) < current;
           return Expanded(
-              child: Divider(thickness: 1, color: context.colors.border));
+            flex: 1,
+            child: Container(
+              height: 1.5,
+              color: leftDone
+                  ? AppColors.success.withValues(alpha: 0.5)
+                  : context.colors.border,
+            ),
+          );
         }
+
         final idx = i ~/ 2;
         final done = idx < current;
         final active = idx == current;
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 20,
-              height: 20,
-              decoration: BoxDecoration(
-                color: done
-                    ? AppColors.success.withValues(alpha: 0.15)
-                    : active
-                        ? AppColors.primary.withValues(alpha: 0.15)
-                        : Colors.transparent,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: done
-                      ? AppColors.success
-                      : active
-                          ? AppColors.primary
-                          : context.colors.border,
-                  width: 1.5,
+
+        final circleColor = done
+            ? AppColors.success
+            : active
+                ? AppColors.primary
+                : context.colors.border;
+        final circleFill = done
+            ? AppColors.success.withValues(alpha: 0.12)
+            : active
+                ? AppColors.primary.withValues(alpha: 0.12)
+                : Colors.transparent;
+        final labelColor = done
+            ? AppColors.success
+            : active
+                ? AppColors.primaryLight
+                : context.colors.textMuted;
+
+        return Flexible(
+          flex: 3,
+          // Loose fit: takes at most its share, never forces overflow
+          fit: FlexFit.loose,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 20,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: circleFill,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: circleColor, width: 1.5),
+                ),
+                child: Icon(
+                  done ? Icons.check : Icons.circle,
+                  size: 10,
+                  color: circleColor,
                 ),
               ),
-              child: Icon(
-                done ? Icons.check : Icons.circle,
-                size: 10,
-                color: done
-                    ? AppColors.success
-                    : active
-                        ? AppColors.primary
-                        : context.colors.textMuted,
+              const SizedBox(width: 3),
+              // Flexible text: clips with ellipsis rather than overflowing
+              Flexible(
+                child: Text(
+                  stepList[idx],
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                  style: TextStyle(
+                    color: labelColor,
+                    fontSize: 10,
+                    fontWeight: active ? FontWeight.w700 : FontWeight.w400,
+                  ),
+                ),
               ),
-            ),
-            SizedBox(width: 4),
-            Text(
-              stepList[idx],
-              style: TextStyle(
-                color: done
-                    ? AppColors.success
-                    : active
-                        ? AppColors.primaryLight
-                        : context.colors.textMuted,
-                fontSize: 10,
-                fontWeight: active ? FontWeight.w700 : FontWeight.w400,
-              ),
-            ),
-          ],
+            ],
+          ),
         );
       }),
     );
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  ChecklistMissionBanner
+// ─────────────────────────────────────────────────────────────────────────────
 class ChecklistMissionBanner extends StatelessWidget {
   final String title;
   const ChecklistMissionBanner({super.key, required this.title});
@@ -79,7 +110,7 @@ class ChecklistMissionBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: context.colors.surface,
         borderRadius: BorderRadius.circular(10),
@@ -88,7 +119,7 @@ class ChecklistMissionBanner extends StatelessWidget {
       child: Row(
         children: [
           Icon(Icons.flight, size: 15, color: context.colors.textMuted),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(title,
                 style: TextStyle(
@@ -100,6 +131,9 @@ class ChecklistMissionBanner extends StatelessWidget {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  ChecklistSectionHeader
+// ─────────────────────────────────────────────────────────────────────────────
 class ChecklistSectionHeader extends StatelessWidget {
   final String label;
   const ChecklistSectionHeader({super.key, required this.label});
@@ -121,6 +155,9 @@ class ChecklistSectionHeader extends StatelessWidget {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  ChecklistSubmitBar
+// ─────────────────────────────────────────────────────────────────────────────
 class ChecklistSubmitBar extends StatelessWidget {
   final String label;
   final int checked;
@@ -141,7 +178,7 @@ class ChecklistSubmitBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return SafeArea(
       child: Container(
-        padding: EdgeInsets.fromLTRB(16, 10, 16, 12),
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
         decoration: BoxDecoration(
           color: context.colors.surface,
           border: Border(top: BorderSide(color: context.colors.border)),
@@ -151,9 +188,14 @@ class ChecklistSubmitBar extends StatelessWidget {
           children: [
             Row(
               children: [
-                Text('$checked of $total items responded',
+                Flexible(
+                  child: Text(
+                    '$checked of $total items responded',
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                        color: context.colors.textSecondary, fontSize: 12)),
+                        color: context.colors.textSecondary, fontSize: 12),
+                  ),
+                ),
                 const Spacer(),
                 if (checked < total)
                   Text('${total - checked} remaining',
@@ -174,7 +216,10 @@ class ChecklistSubmitBar extends StatelessWidget {
                         child: CircularProgressIndicator(
                             color: Colors.white, strokeWidth: 2))
                     : const Icon(Icons.arrow_forward, size: 18),
-                label: Text(isSaving ? 'Saving...' : label),
+                label: Text(
+                  isSaving ? 'Saving...' : label,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ),
           ],

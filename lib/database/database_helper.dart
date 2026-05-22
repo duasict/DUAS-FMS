@@ -13,7 +13,7 @@ import '../utils/app_constants.dart';
 
 class DatabaseHelper {
   static const _dbName = 'uas_fms.db';
-  static const _dbVersion = 5;
+  static const _dbVersion = 6;
 
   DatabaseHelper._();
   static final DatabaseHelper instance = DatabaseHelper._();
@@ -200,6 +200,15 @@ class DatabaseHelper {
         )
       ''');
     }
+    if (oldVersion < 6) {
+      // ── user_profile: add license_verified and face_verified booleans
+      await db.execute(
+          "ALTER TABLE user_profile ADD COLUMN license_verified INTEGER NOT NULL DEFAULT 0");
+      await db.execute(
+          "ALTER TABLE user_profile ADD COLUMN face_verified INTEGER NOT NULL DEFAULT 0");
+      // Migrate legacy 'rpic' profile roles → 'pic'
+      await db.execute("UPDATE user_profile SET role = 'pic' WHERE role = 'rpic'");
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -370,11 +379,13 @@ class DatabaseHelper {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         supabase_id TEXT NOT NULL DEFAULT '',
         name TEXT NOT NULL DEFAULT '',
-        role TEXT NOT NULL DEFAULT 'rpic',
+        role TEXT NOT NULL DEFAULT 'vo',
         email TEXT NOT NULL DEFAULT '',
         unit TEXT NOT NULL DEFAULT '',
         license_number TEXT NOT NULL DEFAULT '',
         license_expiry_date TEXT NOT NULL DEFAULT '',
+        license_verified INTEGER NOT NULL DEFAULT 0,
+        face_verified INTEGER NOT NULL DEFAULT 0,
         phone TEXT NOT NULL DEFAULT '',
         photo_path TEXT DEFAULT '',
         organization_id TEXT NOT NULL DEFAULT ''
