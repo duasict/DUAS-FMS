@@ -44,7 +44,7 @@ class FmsApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final themeMode = context.watch<ThemeProvider>().mode;
     return MaterialApp(
-      title: 'DUAS',
+      title: 'FMS',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
