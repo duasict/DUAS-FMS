@@ -239,7 +239,7 @@ class _FlightLogScreenState extends State<FlightLogScreen> {
       appBar: AppBar(
         title: const Text('Flight Log & Report'),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(36),
+          preferredSize: const Size.fromHeight(32),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             child: ChecklistProgressBar(current: 3),
@@ -330,9 +330,9 @@ class _FlightLogScreenState extends State<FlightLogScreen> {
                   ),
                 ]),
                 _logSection('CREW', Icons.people_outline, [
-                  _field('RPIC', _rpicCtrl),
-                  _field('VO (Visual Observer)', _voCtrl),
-                  _field('Tech / Payload Operator', _techCtrl),
+                  _field('RPIC', _rpicCtrl, readOnly: true),
+                  _field('VO (Visual Observer)', _voCtrl, readOnly: true),
+                  _field('Tech / Payload Operator', _techCtrl, readOnly: true),
                 ]),
                 _logSection('FLIGHT DURATION', Icons.timer_outlined, [
                   ...List.generate(3, (i) => _flightRow(i)),
@@ -502,9 +502,10 @@ class _FlightLogScreenState extends State<FlightLogScreen> {
   }
 
   Widget _field(String label, TextEditingController ctrl,
-      {String? hint}) {
+      {String? hint, bool readOnly = false}) {
     return TextField(
       controller: ctrl,
+      readOnly: readOnly,
       style: TextStyle(color: context.colors.textPrimary, fontSize: 13),
       decoration: InputDecoration(
         labelText: label,

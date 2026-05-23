@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../database/database_helper.dart';
 import '../../utils/app_constants.dart';
 import '../../models/checklist_item.dart';
+import '../../models/crew_member.dart';
 import '../../providers/app_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/checklist_tile.dart';
@@ -90,9 +91,15 @@ class _FitToFlyScreenState extends State<FitToFlyScreen> {
       _timeCtrl.text = mission.timeStr;
       _locationCtrl.text = mission.location;
       _rpaModelCtrl.text = mission.aircraftName;
-      final rpic = mission.crew.where((c) => c.role == 'RPIC').firstOrNull;
-      if (rpic != null) _picCtrl.text = rpic.name;
     }
+
+    // Auto-populate PIC from mission RPIC crew member
+    final crew = await DatabaseHelper.instance.getCrewForMission(widget.missionId);
+    final rpic = crew.firstWhere(
+      (c) => c.role.toLowerCase() == 'rpic',
+      orElse: () => CrewMember(missionId: widget.missionId, name: '', role: ''),
+    );
+    if (rpic.name.isNotEmpty) _picCtrl.text = rpic.name;
 
     final savedRecord =
         await DatabaseHelper.instance.getFitToFlyRecord(widget.missionId);
