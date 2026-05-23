@@ -7,9 +7,11 @@ import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart
 import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/user_profile_provider.dart';
+import '../../services/face_recognition_service.dart';
 import '../../theme/app_theme.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -42,48 +44,102 @@ class _LicenseVerificationScreenState
   String? _scanError;
   bool _ocrDone = false;
 
-  // Step 2 — face
+  // Step 2 — face (manual)
   Uint8List? _idFaceCrop;
   File? _selfieImage;
   bool _isDetectingFace = false;
   bool _faceConfirmed = false;
   bool _faceStepSkipped = false;
 
-  // ── OCR regex patterns ─────────────────────────────────────────────────────
+  // Step 2 — face similarity / Change 10 (TFLite MobileFaceNet)
+  double? _faceSimilarityScore;
+  bool _isComparingFaces = false;
+  String? _faceMatchError;
+  bool _faceModelAvailable = false;
+
+  // Step 1 — manual OCR fallback / Change 4
+  final _manualLicenseCtrl = TextEditingController();
+  final _manualExpiryCtrl = TextEditingController();
+
+  // ── OCR regex patterns (Change 4 — enhanced) ──────────────────────────────
 
   // CAAP RPA / UAS license number patterns (case-insensitive)
   static final _licensePatterns = [
     // Most specific first: explicit CAAP/RPA prefix
     RegExp(r'RPA[-\s]?[A-Z0-9]{4,12}', caseSensitive: false),
     RegExp(r'CAAP[-\s][A-Z]{2,4}[-\s][A-Z0-9]{4,12}', caseSensitive: false),
-    // "License No." or "Cert. No." followed by alphanumeric
-    RegExp(r'(?:licen[sc]e|cert(?:ificate)?|no\.?)\s*[:#]?\s*([A-Z0-9][-A-Z0-9]{5,})',
+    // OCR-space-corruption variants (e.g., "R PA", "CA AP")
+    RegExp(r'R\s*P\s*A\s*[-\s]?[A-Z0-9]{4,12}', caseSensitive: false),
+    // "License No." / "Cert. No." / "Reg." followed by alphanumeric
+    RegExp(
+        r'(?:licen[sc]e|cert(?:ificate)?|certif\.|reg(?:istration)?|no\.?)'
+        r'\s*[:#]?\s*([A-Z0-9][-A-Z0-9]{5,})',
         caseSensitive: false),
-    // Fallback: any all-caps/digit sequence 6-16 chars with at least one dash
+    // Fallback: all-caps/digit sequence with at least one dash
     RegExp(r'\b([A-Z]{2,6}-[A-Z0-9]{2,10}(?:-[A-Z0-9]{2,10})*)\b'),
+    // Fallback 2: letter prefix + 4-10 digits (e.g., "RPC12345678")
+    RegExp(r'\b([A-Z]{2,4}[0-9]{4,10}[A-Z0-9]{0,4})\b'),
   ];
 
-  // Expiry date keywords + date capture
+  // Context keywords indicating the adjacent line contains a license number
+  static final _licenseContextRe = RegExp(
+      r'licen[sc]e|cert(?:ificate)?|certif\.|reg(?:istration)?|cert\s*no|lic\s*no',
+      caseSensitive: false);
+
+  // Expiry date keywords + inline date capture
   static final _expiryPatterns = [
-    // "valid until", "expiry date", "expires", "exp."
     RegExp(
-        r'(?:valid\s*(?:until|thru)|expir(?:y|es?|ation)|exp\.?)\s*[:#]?\s*'
+        r'(?:valid\s*(?:until|thru|up\s*to)|expir(?:y|es?|ation)|exp\.?|validity)'
+        r'\s*[:#]?\s*'
         r'(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4})',
         caseSensitive: false),
     RegExp(
-        r'(?:valid\s*(?:until|thru)|expir(?:y|es?|ation)|exp\.?)\s*[:#]?\s*'
-        r'(\w+ \d{1,2},?\s*\d{4})',
+        r'(?:valid\s*(?:until|thru|up\s*to)|expir(?:y|es?|ation)|exp\.?|validity)'
+        r'\s*[:#]?\s*'
+        r'(\w{3,}\s+\d{1,2},?\s*\d{4})',
         caseSensitive: false),
     RegExp(
-        r'(?:valid\s*(?:until|thru)|expir(?:y|es?|ation)|exp\.?)\s*[:#]?\s*'
-        r'(\d{1,2}\s+\w+\s+\d{4})',
+        r'(?:valid\s*(?:until|thru|up\s*to)|expir(?:y|es?|ation)|exp\.?|validity)'
+        r'\s*[:#]?\s*'
+        r'(\d{1,2}\s+\w{3,}\s+\d{4})',
         caseSensitive: false),
-    // Bare date after known keyword (e.g. "VALIDITY: 12/31/2026")
     RegExp(r'VALIDITY[:\s]+(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4})',
         caseSensitive: false),
   ];
 
+  // Bare date patterns for last-resort expiry extraction
+  static final _bareDatePatterns = [
+    RegExp(r'\b(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4})\b'),
+    RegExp(r'\b(\d{1,2}\s+\w{3,}\s+\d{4})\b'),
+    RegExp(r'\b(\w{3,}\s+\d{1,2},?\s+\d{4})\b'),
+  ];
+
+  // Keywords indicating a line is about expiry/validity
+  static final _expiryContextRe = RegExp(
+      r'valid|expir|validity|exp\.?|thru|up\s*to',
+      caseSensitive: false);
+
   // ── Lifecycle ──────────────────────────────────────────────────────────────
+  @override
+  void initState() {
+    super.initState();
+    _initFaceModel();
+  }
+
+  Future<void> _initFaceModel() async {
+    await FaceRecognitionService.initialize();
+    if (mounted) {
+      setState(() => _faceModelAvailable = FaceRecognitionService.isAvailable);
+    }
+  }
+
+  @override
+  void dispose() {
+    _manualLicenseCtrl.dispose();
+    _manualExpiryCtrl.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -382,10 +438,11 @@ class _LicenseVerificationScreenState
             ),
           ] else ...[
             _alertCard(
-                'License number could not be extracted automatically. '
-                'Please ensure the card is well-lit, in focus, and the '
-                'full front side is visible.',
+                'License number could not be extracted. Try retaking in '
+                'better lighting, or enter it manually below.',
                 AppColors.warning),
+            const SizedBox(height: 14),
+            _manualEntrySection(),
           ],
         ],
       ],
@@ -500,6 +557,107 @@ class _LicenseVerificationScreenState
     }
   }
 
+  /// Manual license/expiry entry shown when OCR fails (Change 4).
+  Widget _manualEntrySection() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: context.colors.border),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(
+          'MANUAL ENTRY',
+          style: TextStyle(
+              color: context.colors.textMuted,
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.8),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _manualLicenseCtrl,
+          textCapitalization: TextCapitalization.characters,
+          style: TextStyle(color: context.colors.textPrimary, fontSize: 14),
+          decoration: InputDecoration(
+            labelText: 'License / Certificate Number',
+            labelStyle:
+                TextStyle(color: context.colors.textSecondary, fontSize: 12),
+            prefixIcon:
+                Icon(Icons.badge_outlined, size: 18, color: context.colors.textMuted),
+            filled: true,
+            fillColor: context.colors.card,
+            contentPadding:
+                const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+            border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: context.colors.border)),
+            enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: context.colors.border)),
+            focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide:
+                    const BorderSide(color: AppColors.primary, width: 1.5)),
+          ),
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _manualExpiryCtrl,
+          style: TextStyle(color: context.colors.textPrimary, fontSize: 14),
+          decoration: InputDecoration(
+            labelText: 'Valid Until (MM/DD/YYYY)',
+            labelStyle:
+                TextStyle(color: context.colors.textSecondary, fontSize: 12),
+            prefixIcon:
+                Icon(Icons.event_outlined, size: 18, color: context.colors.textMuted),
+            filled: true,
+            fillColor: context.colors.card,
+            contentPadding:
+                const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+            border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: context.colors.border)),
+            enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: context.colors.border)),
+            focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide:
+                    const BorderSide(color: AppColors.primary, width: 1.5)),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          height: 44,
+          child: ElevatedButton.icon(
+            onPressed: () {
+              final num = _manualLicenseCtrl.text.trim().toUpperCase();
+              if (num.isEmpty) return;
+              final iso = _parseToIso(_manualExpiryCtrl.text.trim());
+              setState(() {
+                _extractedLicenseNumber = num;
+                if (iso != null) _extractedExpiryDate = iso;
+                _scanError = null;
+              });
+            },
+            icon: const Icon(Icons.check, size: 16),
+            label: const Text('Use This',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
+        ),
+      ]),
+    );
+  }
+
   // ════════════════════════════════════════════════════════════════════════════
   // STEP 2 — Face Check
   // ════════════════════════════════════════════════════════════════════════════
@@ -533,42 +691,59 @@ class _LicenseVerificationScreenState
           const SizedBox(height: 16),
         ],
 
-        if (_selfieImage != null && !_isDetectingFace) ...[
-          const SizedBox(height: 8),
-          Text(
-            'Do the two faces match?',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-                color: context.colors.textSecondary,
-                fontSize: 13,
-                fontWeight: FontWeight.w600),
+        if (_isComparingFaces) ...[
+          const SizedBox(height: 20),
+          const Center(
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              CircularProgressIndicator(
+                  strokeWidth: 2, color: AppColors.primary),
+              SizedBox(height: 12),
+              Text('Comparing faces…',
+                  style: TextStyle(color: AppColors.primary, fontSize: 13)),
+            ]),
           ),
+        ] else if (_selfieImage != null && !_isDetectingFace) ...[
           const SizedBox(height: 12),
-          Row(children: [
-            Expanded(
-              child: _outlineButton(
-                label: 'Not a Match',
-                icon: Icons.close,
-                color: AppColors.danger,
-                onPressed: () => setState(() {
-                  _selfieImage = null;
-                  _faceConfirmed = false;
-                }),
-              ),
+          // Automated result (Change 10) when model ran; manual fallback otherwise
+          if (_faceModelAvailable &&
+              (_faceSimilarityScore != null || _faceMatchError != null))
+            _faceScoreResult()
+          else ...[
+            Text(
+              'Do the two faces match?',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  color: context.colors.textSecondary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _primaryButton(
-                label: 'Faces Match',
-                icon: Icons.check,
-                color: AppColors.success,
-                onPressed: () => setState(() {
-                  _faceConfirmed = true;
-                  _step = 3;
-                }),
+            const SizedBox(height: 12),
+            Row(children: [
+              Expanded(
+                child: _outlineButton(
+                  label: 'Not a Match',
+                  icon: Icons.close,
+                  color: AppColors.danger,
+                  onPressed: () => setState(() {
+                    _selfieImage = null;
+                    _faceConfirmed = false;
+                  }),
+                ),
               ),
-            ),
-          ]),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _primaryButton(
+                  label: 'Faces Match',
+                  icon: Icons.check,
+                  color: AppColors.success,
+                  onPressed: () => setState(() {
+                    _faceConfirmed = true;
+                    _step = 3;
+                  }),
+                ),
+              ),
+            ]),
+          ],
         ] else if (_selfieImage == null) ...[
           _primaryButton(
             label: _isDetectingFace ? 'Detecting…' : 'Take Selfie',
@@ -695,6 +870,113 @@ class _LicenseVerificationScreenState
     ]);
   }
 
+  /// Score-based result card shown after automated TFLite comparison (Change 10).
+  Widget _faceScoreResult() {
+    // Error without a score → fall back to manual confirmation
+    if (_faceMatchError != null && _faceSimilarityScore == null) {
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        _alertCard(
+            'Face comparison failed: $_faceMatchError\nPlease confirm manually.',
+            AppColors.warning),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(
+            child: _outlineButton(
+              label: 'Not a Match',
+              icon: Icons.close,
+              color: AppColors.danger,
+              onPressed: () => setState(() {
+                _selfieImage = null;
+                _faceConfirmed = false;
+              }),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: _primaryButton(
+              label: 'Faces Match',
+              icon: Icons.check,
+              color: AppColors.success,
+              onPressed: () => setState(() {
+                _faceConfirmed = true;
+                _step = 3;
+              }),
+            ),
+          ),
+        ]),
+      ]);
+    }
+
+    final score = _faceSimilarityScore!;
+    final pct = (score * 100).round();
+    final Color resultColor;
+    final IconData resultIcon;
+    final String resultLabel;
+
+    if (score >= 0.65) {
+      resultColor = AppColors.success;
+      resultIcon = Icons.check_circle_outline;
+      resultLabel = 'Match confirmed — $pct% similarity';
+    } else if (score >= 0.40) {
+      resultColor = AppColors.warning;
+      resultIcon = Icons.help_outline;
+      resultLabel = 'Possible match — $pct% similarity\nReview the images carefully.';
+    } else {
+      resultColor = AppColors.danger;
+      resultIcon = Icons.cancel_outlined;
+      resultLabel = 'No match detected — $pct% similarity\nRetake your selfie.';
+    }
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: resultColor.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: resultColor.withValues(alpha: 0.35)),
+        ),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Icon(resultIcon, color: resultColor, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(resultLabel,
+                style: TextStyle(color: resultColor, fontSize: 13, height: 1.4)),
+          ),
+        ]),
+      ),
+      const SizedBox(height: 12),
+      if (score >= 0.65) ...[
+        _primaryButton(
+          label: 'Continue to Confirm',
+          icon: Icons.arrow_forward,
+          color: AppColors.success,
+          onPressed: () => setState(() => _step = 3),
+        ),
+      ] else ...[
+        _primaryButton(
+          label: 'Retake Selfie',
+          icon: Icons.camera_front_outlined,
+          onPressed: () => setState(() {
+            _selfieImage = null;
+            _faceSimilarityScore = null;
+            _faceMatchError = null;
+            _faceConfirmed = false;
+          }),
+        ),
+        const SizedBox(height: 8),
+        _outlineButton(
+          label: 'Override — Proceed Anyway',
+          icon: Icons.arrow_forward,
+          color: context.colors.textSecondary,
+          onPressed: () => setState(() {
+            _faceConfirmed = true;
+            _step = 3;
+          }),
+        ),
+      ],
+    ]);
+  }
+
   // ════════════════════════════════════════════════════════════════════════════
   // STEP 3 — Confirm & Save
   // ════════════════════════════════════════════════════════════════════════════
@@ -750,7 +1032,9 @@ class _LicenseVerificationScreenState
                 Icons.face_outlined,
                 'Face Verified',
                 _faceConfirmed
-                    ? 'Yes — faces confirmed match'
+                    ? (_faceSimilarityScore != null
+                        ? 'Yes — ${(_faceSimilarityScore! * 100).round()}% similarity'
+                        : 'Yes — confirmed match')
                     : _faceStepSkipped
                         ? 'Skipped'
                         : 'Not completed'),
@@ -912,39 +1196,25 @@ class _LicenseVerificationScreenState
     });
 
     try {
-      // ── Text Recognition ────────────────────────────────────────────────
+      // ── Preprocess image for better OCR accuracy (Change 4) ─────────────
+      final processedPath = await _preprocessImageForOcr(_idImage!.path);
+
+      // ── Text Recognition ─────────────────────────────────────────────────
       final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
-      final inputImage = InputImage.fromFilePath(_idImage!.path);
+      final inputImage = InputImage.fromFilePath(processedPath);
       final recognized = await textRecognizer.processImage(inputImage);
       await textRecognizer.close();
 
       final fullText = recognized.text;
+      final lines = fullText
+          .split('\n')
+          .map((l) => l.trim())
+          .where((l) => l.isNotEmpty)
+          .toList();
 
-      // ── Extract license number ───────────────────────────────────────────
-      String licenseNumber = '';
-      for (final pattern in _licensePatterns) {
-        final match = pattern.firstMatch(fullText);
-        if (match != null) {
-          licenseNumber = (match.groupCount > 0 ? match.group(1) : match.group(0))
-                  ?.trim()
-                  .toUpperCase() ??
-              '';
-          if (licenseNumber.isNotEmpty) break;
-        }
-      }
-
-      // ── Extract expiry date ──────────────────────────────────────────────
-      String? expiryIso;
-      for (final pattern in _expiryPatterns) {
-        final match = pattern.firstMatch(fullText);
-        if (match != null) {
-          final raw = (match.groupCount > 0 ? match.group(1) : match.group(0))
-                  ?.trim() ??
-              '';
-          expiryIso = _parseToIso(raw);
-          if (expiryIso != null) break;
-        }
-      }
+      // ── Multi-pass extraction (Change 4) ──────────────────────────────────
+      final licenseNumber = _extractLicenseNumber(fullText, lines);
+      final expiryIso = _extractExpiryDate(fullText, lines);
 
       // ── Face detection ───────────────────────────────────────────────────
       Uint8List? faceCrop;
@@ -962,8 +1232,8 @@ class _LicenseVerificationScreenState
         _isScanning = false;
         if (licenseNumber.isEmpty) {
           _scanError =
-              'No license number pattern found. Ensure the card is fully '
-              'visible and try again.';
+              'Could not extract a license number. Check the image '
+              'quality or enter it manually below.';
         }
       });
     } catch (e) {
@@ -972,6 +1242,125 @@ class _LicenseVerificationScreenState
         _scanError = 'Scan failed: $e';
       });
     }
+  }
+
+  /// Upscale + grayscale + contrast-boost the image before OCR (Change 4).
+  Future<String> _preprocessImageForOcr(String path) async {
+    try {
+      final bytes = await File(path).readAsBytes();
+      var image = img.decodeImage(bytes);
+      if (image == null) return path;
+
+      // Upscale if narrower than 1800 px — ML Kit accuracy improves on larger images
+      if (image.width < 1800) {
+        final scale = 1800 / image.width;
+        image = img.copyResize(
+            image, width: 1800, height: (image.height * scale).round());
+      }
+
+      // Grayscale + mild contrast boost
+      image = img.grayscale(image);
+      image = img.adjustColor(image, contrast: 1.35, brightness: 1.05);
+
+      final tempDir = await getTemporaryDirectory();
+      final outPath =
+          '${tempDir.path}/ocr_pre_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      await File(outPath).writeAsBytes(img.encodeJpg(image, quality: 95));
+      return outPath;
+    } catch (_) {
+      return path; // fallback to original on any error
+    }
+  }
+
+  /// Three-pass license number extraction (Change 4):
+  ///   1. Full-text pattern scan
+  ///   2. Per-line pattern scan
+  ///   3. Context-based: value on same/next line after a keyword
+  String _extractLicenseNumber(String fullText, List<String> lines) {
+    String matchFirst(String text) {
+      for (final p in _licensePatterns) {
+        final m = p.firstMatch(text);
+        if (m != null) {
+          final v =
+              (m.groupCount > 0 ? m.group(1) : m.group(0))?.trim().toUpperCase() ?? '';
+          if (v.isNotEmpty) return v;
+        }
+      }
+      return '';
+    }
+
+    // Pass 1 — full text
+    final v1 = matchFirst(fullText);
+    if (v1.isNotEmpty) return v1;
+
+    // Pass 2 — per line
+    for (final line in lines) {
+      final v2 = matchFirst(line);
+      if (v2.isNotEmpty) return v2;
+    }
+
+    // Pass 3 — context: line after a keyword line
+    for (int i = 0; i < lines.length; i++) {
+      if (!_licenseContextRe.hasMatch(lines[i])) continue;
+      // Check current line first
+      final vCur = matchFirst(lines[i]);
+      if (vCur.isNotEmpty) return vCur;
+      // Check next line
+      if (i + 1 < lines.length) {
+        final next = lines[i + 1];
+        final vNext = matchFirst(next);
+        if (vNext.isNotEmpty) return vNext;
+        // Bare alphanumeric fallback on the next line
+        final bare = RegExp(r'\b([A-Z0-9][-A-Z0-9]{5,})\b').firstMatch(next);
+        if (bare != null) return bare.group(1)?.trim().toUpperCase() ?? '';
+      }
+    }
+
+    return '';
+  }
+
+  /// Three-pass expiry date extraction (Change 4):
+  ///   1. Full-text pattern scan with keyword anchor
+  ///   2. Per-line: line has expiry keyword → extract bare date
+  ///   3. Context-based: bare date on the line after a keyword line
+  String? _extractExpiryDate(String fullText, List<String> lines) {
+    // Pass 1 — full text with keyword anchors
+    for (final p in _expiryPatterns) {
+      final m = p.firstMatch(fullText);
+      if (m != null) {
+        final raw =
+            (m.groupCount > 0 ? m.group(1) : m.group(0))?.trim() ?? '';
+        final iso = _parseToIso(raw);
+        if (iso != null) return iso;
+      }
+    }
+
+    // Pass 2 — per line: line contains expiry keyword + inline date
+    for (final line in lines) {
+      if (!_expiryContextRe.hasMatch(line)) continue;
+      for (final p in _bareDatePatterns) {
+        final m = p.firstMatch(line);
+        if (m != null) {
+          final iso = _parseToIso(m.group(1)?.trim() ?? '');
+          if (iso != null) return iso;
+        }
+      }
+    }
+
+    // Pass 3 — context: bare date on next line after an expiry-keyword line
+    for (int i = 0; i < lines.length - 1; i++) {
+      if (!_expiryContextRe.hasMatch(lines[i])) continue;
+      final next = lines[i + 1];
+      for (final p in _bareDatePatterns) {
+        final m = p.firstMatch(next);
+        if (m != null) {
+          final iso = _parseToIso(m.group(1)?.trim() ?? '');
+          if (iso != null) return iso;
+        }
+      }
+    }
+
+    return null;
   }
 
   Future<Uint8List?> _detectAndCropFace(String imagePath) async {
@@ -1016,7 +1405,12 @@ class _LicenseVerificationScreenState
   }
 
   Future<void> _takeSelfie() async {
-    setState(() => _isDetectingFace = true);
+    setState(() {
+      _isDetectingFace = true;
+      _faceSimilarityScore = null;
+      _faceMatchError = null;
+      _faceConfirmed = false;
+    });
     try {
       final picker = ImagePicker();
       final picked = await picker.pickImage(
@@ -1032,8 +1426,36 @@ class _LicenseVerificationScreenState
         _selfieImage = File(picked.path);
         _isDetectingFace = false;
       });
+      // Auto-run TFLite comparison when model is available (Change 10)
+      if (_faceModelAvailable && _idFaceCrop != null) {
+        await _runFaceComparison();
+      }
     } catch (e) {
       setState(() => _isDetectingFace = false);
+    }
+  }
+
+  /// TFLite MobileFaceNet comparison between ID crop and selfie (Change 10).
+  Future<void> _runFaceComparison() async {
+    if (_selfieImage == null || _idFaceCrop == null) return;
+    setState(() => _isComparingFaces = true);
+    try {
+      final selfieBytes = await _selfieImage!.readAsBytes();
+      final result = await FaceRecognitionService.compareFaces(
+        idFaceBytes: _idFaceCrop!,
+        selfieBytes: selfieBytes,
+      );
+      setState(() {
+        _faceSimilarityScore = result.score;
+        _faceMatchError = result.error;
+        _faceConfirmed = result.matched;
+        _isComparingFaces = false;
+      });
+    } catch (e) {
+      setState(() {
+        _faceMatchError = 'Comparison failed: $e';
+        _isComparingFaces = false;
+      });
     }
   }
 

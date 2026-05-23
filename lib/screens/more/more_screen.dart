@@ -11,7 +11,9 @@ import '../incidents/incident_history_screen.dart';
 import '../license/license_verification_screen.dart';
 import '../login_screen.dart';
 import '../maintenance/maintenance_history_screen.dart';
+import '../reports/fleet_summary_screen.dart';
 import 'about_screen.dart';
+import 'crew_management_screen.dart';
 import 'data_storage_screen.dart';
 import 'help_documentation_screen.dart';
 import 'notification_preferences_screen.dart';
@@ -107,6 +109,16 @@ class MoreScreen extends StatelessWidget {
                 MaterialPageRoute(builder: (_) => const ProfileScreen())),
           ),
           _LicenseVerificationTile(profile: profile),
+          if (profile.role == 'crp')
+            _NavTile(
+              icon: Icons.manage_accounts_outlined,
+              title: 'Crew Management',
+              subtitle: 'Manage roles and org members',
+              iconColor: AppColors.accent,
+              onTap: () => Navigator.push(context,
+                  MaterialPageRoute(
+                      builder: (_) => const CrewManagementScreen())),
+            ),
           const SizedBox(height: 8),
           const _SectionLabel(label: 'APP'),
           _NavTile(
@@ -163,6 +175,16 @@ class MoreScreen extends StatelessWidget {
             onTap: () => Navigator.push(context,
                 MaterialPageRoute(builder: (_) => const IncidentHistoryScreen())),
           ),
+          if (profile.role == 'crp')
+            _NavTile(
+              icon: Icons.bar_chart_outlined,
+              title: 'Fleet Summary',
+              subtitle: 'Aggregate stats and PDF export',
+              iconColor: AppColors.success,
+              onTap: () => Navigator.push(context,
+                  MaterialPageRoute(
+                      builder: (_) => const FleetSummaryScreen())),
+            ),
           const SizedBox(height: 8),
           const _SectionLabel(label: 'SUPPORT'),
           _NavTile(

@@ -116,6 +116,50 @@ class SupabaseService {
           .from('flight_logs')
           .upsert(data, onConflict: 'mission_id');
 
+  // ── Org Members (Change 5) ────────────────────────────────────────────────
+
+  /// Returns all user profiles that belong to [orgId].
+  static Future<List<Map<String, dynamic>>> fetchOrgMembers(
+      String orgId) async {
+    final rows = await client
+        .from('profiles')
+        .select('id, name, email, role, license_verified, license_number')
+        .eq('organization_id', orgId)
+        .order('name');
+    return List<Map<String, dynamic>>.from(rows);
+  }
+
+  /// Updates the [role] field of a member in the remote profiles table.
+  static Future<void> updateMemberRole(
+          String userId, String role) =>
+      client.from('profiles').update({'role': role}).eq('id', userId);
+
+  /// Removes a member from the org by clearing their organization_id.
+  static Future<void> removeOrgMember(String userId) => client
+      .from('profiles')
+      .update({'organization_id': ''}).eq('id', userId);
+
+  // ── Concurrence Polling (Change 5) ───────────────────────────────────────
+
+  /// Polls Supabase for the latest concurrence status of a mission.
+  /// Used as the online polling fallback instead of Realtime subscriptions.
+  static Future<String?> fetchRemoteConcurrenceStatus({
+    required String missionRef,
+    required String organizationId,
+  }) async {
+    try {
+      final result = await client
+          .from('missions')
+          .select('crp_concurrence_status')
+          .eq('mission_ref', missionRef)
+          .eq('organization_id', organizationId)
+          .maybeSingle();
+      return result?['crp_concurrence_status'] as String?;
+    } catch (_) {
+      return null;
+    }
+  }
+
   // ── Standalone Logs ───────────────────────────────────────────────────────
 
   static Future<void> upsertMaintenanceLogs(List<Map<String, dynamic>> rows) =>

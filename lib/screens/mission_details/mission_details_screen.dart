@@ -26,6 +26,7 @@ class MissionDetailsScreen extends StatefulWidget {
 
 class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
   Mission? _mission;
+  Map<String, dynamic>? _latestBatteryLog;
   bool _isLoading = true;
 
   @override
@@ -36,7 +37,18 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
 
   Future<void> _load() async {
     final m = await DatabaseHelper.instance.getMissionById(widget.missionId);
-    if (mounted) setState(() { _mission = m; _isLoading = false; });
+    Map<String, dynamic>? battLog;
+    if (m?.aircraftId != null) {
+      battLog = await DatabaseHelper.instance
+          .getLatestBatteryLogByAircraft(m!.aircraftId!);
+    }
+    if (mounted) {
+      setState(() {
+        _mission = m;
+        _latestBatteryLog = battLog;
+        _isLoading = false;
+      });
+    }
   }
 
   void _navigateToStep(Widget screen) {
@@ -199,6 +211,10 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
             _ConcurrenceBanner(status: m.crpConcurrenceStatus),
           if (m.crpAdvisoryNotes.isNotEmpty)
             _CrpAdvisoryCard(notes: m.crpAdvisoryNotes),
+
+          // Pre-flight battery health alert
+          if (m.aircraftId != null)
+            _BatteryAlertCard(batteryLog: _latestBatteryLog),
 
           _headerCard(m),
           const SizedBox(height: 10),
@@ -841,5 +857,68 @@ class _BottomAction extends StatelessWidget {
     if (!m.hasPostflightComplete) return Icons.flight_land;
     if (!m.hasFlightlogComplete) return Icons.book_outlined;
     return Icons.check;
+  }
+}
+
+// ── Pre-flight Battery Health Alert ─────────────────────────────────────────
+
+class _BatteryAlertCard extends StatelessWidget {
+  final Map<String, dynamic>? batteryLog;
+  const _BatteryAlertCard({required this.batteryLog});
+
+  @override
+  Widget build(BuildContext context) {
+    final String status = batteryLog?['status'] as String? ?? '';
+    final String battId = batteryLog?['battery_id'] as String? ?? '';
+    final String logDate = batteryLog?['log_date'] as String? ?? '';
+
+    if (status.isEmpty || status == 'good') return const SizedBox.shrink();
+
+    final bool isReplace = status == 'replace' || status == 'retired';
+    final Color color = isReplace ? AppColors.danger : AppColors.warning;
+    final IconData icon = isReplace
+        ? Icons.battery_alert
+        : Icons.battery_charging_full_outlined;
+    final String headline = isReplace
+        ? 'BATTERY REQUIRES REPLACEMENT'
+        : 'BATTERY DEGRADED — MONITOR CAREFULLY';
+    final String detail = battId.isNotEmpty
+        ? 'Battery $battId — last checked $logDate'
+        : 'Last log: $logDate';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Icon(icon, color: color, size: 18),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(
+              headline,
+              style: TextStyle(
+                  color: color,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.8),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              detail,
+              style: TextStyle(
+                  color: color,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  height: 1.4),
+            ),
+          ]),
+        ),
+      ]),
+    );
   }
 }

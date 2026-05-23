@@ -1597,6 +1597,221 @@ class PdfGeneratorService {
 
   // ══════════════════════════════════════════════════════════════════════════
   //  SHARE HELPER
+  // ── Fleet Summary Report ─────────────────────────────────────────────────
+
+  /// Generates a one-page fleet summary PDF covering [missions] and basic stats.
+  ///
+  /// Parameters:
+  ///   [org]          – organisation settings (name, address, etc.)
+  ///   [rangeLabel]   – human-readable date range, e.g. "Jan 2026 – May 2026"
+  ///   [missions]     – all missions to summarise
+  ///   [flightLogs]   – raw flight log maps from the database
+  ///   [maintenance]  – raw maintenance log maps
+  ///   [batteryLogs]  – raw battery log maps
+  ///   [incidents]    – raw incident report maps
+  static Future<Uint8List> generateFleetSummary({
+    required OrgSettings org,
+    required String rangeLabel,
+    required List<Mission> missions,
+    required List<Map<String, dynamic>> flightLogs,
+    required List<Map<String, dynamic>> maintenance,
+    required List<Map<String, dynamic>> batteryLogs,
+    required List<Map<String, dynamic>> incidents,
+  }) async {
+    final pdf = pw.Document();
+
+    // ── compute aggregate stats ──────────────────────────────────────────
+    final total        = missions.length;
+    final completed    = missions.where((m) => m.status == 'completed').length;
+    final inProgress   = missions.where((m) => m.status == 'in_progress').length;
+    final cancelled    = missions.where((m) => m.status == 'cancelled').length;
+    final planning     = missions.where((m) => m.status == 'planning').length;
+    final totalMinutes = missions.fold<int>(0, (s, m) => s + (m.duration ?? 0));
+    final flightHours  = totalMinutes / 60.0;
+    final highRisk     = missions.where((m) => m.crpConcurrenceRequired).length;
+    final degradedBat  = batteryLogs
+        .where((b) =>
+            b['status'] == 'degraded' ||
+            b['status'] == 'retired' ||
+            b['status'] == 'replace')
+        .length;
+    final openIncidents = incidents
+        .where((i) => (i['corrective_actions'] as String? ?? '').isEmpty)
+        .length;
+
+    // ── local helpers ────────────────────────────────────────────────────
+
+    pw.Widget statRow(String label, String value, {PdfColor? color}) {
+      return pw.Padding(
+        padding: const pw.EdgeInsets.symmetric(vertical: 3),
+        child: pw.Row(children: [
+          pw.Expanded(
+              child: pw.Text(label,
+                  style: pw.TextStyle(color: _txtMuted, fontSize: 10))),
+          pw.Text(value,
+              style: pw.TextStyle(
+                  color: color ?? _txtDark,
+                  fontSize: 10,
+                  fontWeight: pw.FontWeight.bold)),
+        ]),
+      );
+    }
+
+    pw.Widget summaryCard(String title, List<pw.Widget> rows) {
+      return pw.Container(
+        margin: const pw.EdgeInsets.only(bottom: 12),
+        padding: const pw.EdgeInsets.all(12),
+        decoration: pw.BoxDecoration(
+          border: pw.Border.all(color: _border),
+          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+        ),
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text(title,
+                style: pw.TextStyle(
+                    color: _blue,
+                    fontSize: 9,
+                    fontWeight: pw.FontWeight.bold,
+                    letterSpacing: 0.8)),
+            pw.SizedBox(height: 8),
+            pw.Divider(color: _border, height: 1),
+            pw.SizedBox(height: 6),
+            ...rows,
+          ],
+        ),
+      );
+    }
+
+    pw.Widget fth(String t) => pw.Padding(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          child: pw.Text(t,
+              style: pw.TextStyle(
+                  color: _navy, fontSize: 8, fontWeight: pw.FontWeight.bold)),
+        );
+
+    pw.Widget ftd(String t, {bool mono = false}) => pw.Padding(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          child: pw.Text(t,
+              style: pw.TextStyle(
+                  color: _txtDark,
+                  fontSize: 8,
+                  font: mono ? pw.Font.courier() : null)),
+        );
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(36),
+        header: (ctx) => _pageHeader(org, 'FLEET-SUM', 'Fleet Summary Report'),
+        footer: _footer,
+        build: (ctx) => [
+          // Report meta
+          pw.Container(
+            margin: const pw.EdgeInsets.only(bottom: 16),
+            padding: const pw.EdgeInsets.all(10),
+            decoration: pw.BoxDecoration(
+              color: _rowHdr,
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+            ),
+            child: pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('Period: $rangeLabel',
+                    style: pw.TextStyle(
+                        color: _txtDark,
+                        fontSize: 11,
+                        fontWeight: pw.FontWeight.bold)),
+                pw.Text('Generated: $_todayStr',
+                    style: pw.TextStyle(color: _txtMuted, fontSize: 10)),
+              ],
+            ),
+          ),
+
+          // Mission stats
+          summaryCard('MISSION STATISTICS', [
+            statRow('Total Missions', '$total'),
+            statRow('Completed', '$completed', color: _success),
+            statRow('In Progress', '$inProgress', color: _accent),
+            statRow('Planning', '$planning'),
+            statRow('Cancelled', '$cancelled', color: _danger),
+            statRow('High-Risk (CRP Required)', '$highRisk', color: _warning),
+            statRow('Total Flight Time', '${flightHours.toStringAsFixed(1)} hrs'),
+          ]),
+
+          // Maintenance
+          summaryCard('MAINTENANCE', [
+            statRow('Maintenance Records', '${maintenance.length}'),
+          ]),
+
+          // Battery
+          summaryCard('BATTERY HEALTH', [
+            statRow('Battery Log Entries', '${batteryLogs.length}'),
+            statRow('Degraded / For Replacement', '$degradedBat',
+                color: degradedBat > 0 ? _danger : _txtDark),
+          ]),
+
+          // Safety
+          summaryCard('SAFETY & INCIDENTS', [
+            statRow('Incident Reports', '${incidents.length}'),
+            statRow('Open (no corrective action)', '$openIncidents',
+                color: openIncidents > 0 ? _danger : _success),
+          ]),
+
+          // Mission breakdown table
+          if (missions.isNotEmpty) ...[
+            pw.Text('MISSION BREAKDOWN',
+                style: pw.TextStyle(
+                    color: _blue,
+                    fontSize: 9,
+                    fontWeight: pw.FontWeight.bold,
+                    letterSpacing: 0.8)),
+            pw.SizedBox(height: 8),
+            pw.Table(
+              border: pw.TableBorder.all(color: _border, width: 0.5),
+              columnWidths: const {
+                0: pw.FlexColumnWidth(2.5),
+                1: pw.FlexColumnWidth(2),
+                2: pw.FlexColumnWidth(1.2),
+                3: pw.FlexColumnWidth(1.2),
+              },
+              children: [
+                pw.TableRow(
+                  decoration: pw.BoxDecoration(color: _rowHdr),
+                  children: [
+                    fth('Mission Ref'),
+                    fth('Title'),
+                    fth('Status'),
+                    fth('Duration'),
+                  ],
+                ),
+                ...missions.map((m) {
+                  final mins = m.duration ?? 0;
+                  final dur = mins > 0
+                      ? '${(mins / 60).toStringAsFixed(1)} hr'
+                      : '—';
+                  return pw.TableRow(children: [
+                    ftd(m.missionId, mono: true),
+                    ftd(m.title),
+                    ftd(m.statusLabel),
+                    ftd(dur),
+                  ]);
+                }),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+
+    return pdf.save();
+  }
+
+  static String get _todayStr {
+    final n = DateTime.now();
+    return '${n.year}-${n.month.toString().padLeft(2, '0')}-${n.day.toString().padLeft(2, '0')}';
+  }
+
   // ══════════════════════════════════════════════════════════════════════════
 
   /// Invokes the platform share/save sheet for the given [bytes].

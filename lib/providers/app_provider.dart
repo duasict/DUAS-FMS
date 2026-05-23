@@ -69,6 +69,7 @@ class AppProvider extends ChangeNotifier {
     _missions = await db.getMissionsForUser(
       profile?.name ?? '',
       profile?.role == 'crp',
+      userId: profile?.supabaseId ?? '',
     );
     _aircraft      = await db.getAircraft();
     _alerts        = await db.getAlerts();
@@ -93,6 +94,7 @@ class AppProvider extends ChangeNotifier {
     _missions = await db.getMissionsForUser(
       profile?.name ?? '',
       profile?.role == 'crp',
+      userId: profile?.supabaseId ?? '',
     );
     _stats         = await db.getStats();
     _unsyncedCount = await db.getUnsyncedCount();

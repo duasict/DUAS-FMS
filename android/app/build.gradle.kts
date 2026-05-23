@@ -37,6 +37,11 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+
+    // Prevent the TFLite model from being compressed in the APK
+    androidResources {
+        noCompress += "tflite"
+    }
 }
 
 flutter {

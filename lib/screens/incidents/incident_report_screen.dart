@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../database/database_helper.dart';
+import '../../services/sync_service.dart';
 import '../../theme/app_theme.dart';
 
 class IncidentReportScreen extends StatefulWidget {
@@ -114,13 +115,21 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
 
     if (!mounted) return;
     setState(() => _isSaving = false);
+    await _showSaveResult();
+    if (!mounted) return;
+    Navigator.pop(context);
+  }
+
+  Future<void> _showSaveResult() async {
+    final online = await SyncService.isConnected();
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Incident report filed.'),
-        backgroundColor: AppColors.success,
+      SnackBar(
+        content: Text(online ? 'Saved to cloud ✓' : 'Saved locally — syncs when online'),
+        backgroundColor: online ? AppColors.success : AppColors.warning,
+        duration: const Duration(seconds: 3),
       ),
     );
-    Navigator.pop(context);
   }
 
   @override

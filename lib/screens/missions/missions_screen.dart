@@ -5,6 +5,7 @@ import '../../providers/app_provider.dart';
 import '../../providers/user_profile_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/mission_card.dart';
+import '../../widgets/skeleton_loader.dart';
 import '../mission_details/mission_details_screen.dart';
 import 'mission_create_screen.dart';
 
@@ -145,8 +146,7 @@ class _MissionList extends StatelessWidget {
     final missions = _applySearch(all);
 
     if (provider.isLoading) {
-      return Center(
-          child: CircularProgressIndicator(color: AppColors.primary));
+      return const SkeletonMissionList();
     }
 
     if (missions.isEmpty) {

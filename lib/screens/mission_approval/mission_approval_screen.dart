@@ -5,7 +5,9 @@ import '../../database/database_helper.dart';
 import '../../models/flight_plan.dart';
 import '../../models/hira_row.dart';
 import '../../models/mission.dart';
+import '../../services/notification_service.dart';
 import '../../services/p2p_concurrence_service.dart';
+import '../../services/supabase_service.dart';
 import '../../services/sync_service.dart';
 import '../../theme/app_theme.dart';
 import '../equipment_checklist/equipment_checklist_screen.dart';
@@ -32,22 +34,72 @@ class _MissionApprovalScreenState extends State<MissionApprovalScreen> {
   String _p2pIp = '';
   Timer? _p2pPollTimer;
 
+  // Supabase online polling (60 s)
+  Timer? _supabasePollTimer;
+
   @override
   void initState() {
     super.initState();
     _load();
-    _checkConnectivity();
+    _checkConnectivityAndStartPolling();
   }
 
   @override
   void dispose() {
     _stopPollTimer();
+    _stopSupabasePollTimer();
     super.dispose();
   }
 
-  Future<void> _checkConnectivity() async {
+  Future<void> _checkConnectivityAndStartPolling() async {
     final online = await SyncService.isConnected();
-    if (mounted) setState(() => _isOnline = online);
+    if (!mounted) return;
+    setState(() => _isOnline = online);
+    if (online) _startSupabasePollTimer();
+  }
+
+  // ── Supabase 60-second online poll ───────────────────────────────────────
+
+  void _startSupabasePollTimer() {
+    _supabasePollTimer?.cancel();
+    _supabasePollTimer =
+        Timer.periodic(const Duration(seconds: 60), (_) => _pollSupabase());
+  }
+
+  void _stopSupabasePollTimer() {
+    _supabasePollTimer?.cancel();
+    _supabasePollTimer = null;
+  }
+
+  Future<void> _pollSupabase() async {
+    final m = _mission;
+    if (m == null) return;
+    // Stop polling once a decision is already recorded locally
+    if (m.crpConcurrenceStatus == 'approved' ||
+        m.crpConcurrenceStatus == 'rejected') {
+      _stopSupabasePollTimer();
+      return;
+    }
+
+    final remoteStatus = await SupabaseService.fetchRemoteConcurrenceStatus(
+      missionRef: m.missionId,
+      organizationId: m.organizationId,
+    );
+
+    if (!mounted) return;
+    if (remoteStatus != null &&
+        remoteStatus.isNotEmpty &&
+        remoteStatus != m.crpConcurrenceStatus) {
+      // Persist the new status locally
+      m.crpConcurrenceStatus = remoteStatus;
+      await DatabaseHelper.instance.updateMission(m);
+      if (!mounted) return;
+      setState(() => _mission = m);
+      _stopSupabasePollTimer();
+
+      // Push notification so the RPIC is alerted even if screen is backgrounded
+      await NotificationService.showConcurrenceResult(m.missionId, remoteStatus);
+    }
   }
 
   Future<void> _startP2p() async {

@@ -3,6 +3,7 @@ import '../../database/database_helper.dart';
 import '../../models/aircraft.dart';
 import '../../services/org_settings_service.dart';
 import '../../services/pdf_generator_service.dart';
+import '../../services/sync_service.dart';
 import '../../theme/app_theme.dart';
 
 class BatteryLogScreen extends StatefulWidget {
@@ -107,13 +108,21 @@ class _BatteryLogScreenState extends State<BatteryLogScreen> {
 
     if (!mounted) return;
     setState(() => _isSaving = false);
+    await _showSaveResult();
+    if (!mounted) return;
+    Navigator.pop(context);
+  }
+
+  Future<void> _showSaveResult() async {
+    final online = await SyncService.isConnected();
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Battery log saved.'),
-        backgroundColor: AppColors.success,
+      SnackBar(
+        content: Text(online ? 'Saved to cloud ✓' : 'Saved locally — syncs when online'),
+        backgroundColor: online ? AppColors.success : AppColors.warning,
+        duration: const Duration(seconds: 3),
       ),
     );
-    Navigator.pop(context);
   }
 
   // ── Export Annex A-10 PDF ───────────────────────────────────────────────────

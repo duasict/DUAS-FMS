@@ -14,7 +14,7 @@ import '../services/org_settings_service.dart';
 
 class DatabaseHelper {
   static const _dbName = 'uas_fms.db';
-  static const _dbVersion = 7;
+  static const _dbVersion = 8;
 
   DatabaseHelper._();
   static final DatabaseHelper instance = DatabaseHelper._();
@@ -215,6 +215,11 @@ class DatabaseHelper {
       await db.execute(
           "ALTER TABLE missions ADD COLUMN crp_concurrence_status TEXT NOT NULL DEFAULT ''");
     }
+    if (oldVersion < 8) {
+      // ── crew_members: link crew slots to verified user accounts (Change 5)
+      await db.execute(
+          'ALTER TABLE crew_members ADD COLUMN user_id TEXT');
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -258,7 +263,8 @@ class DatabaseHelper {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         mission_id INTEGER NOT NULL,
         name TEXT NOT NULL,
-        role TEXT NOT NULL
+        role TEXT NOT NULL,
+        user_id TEXT
       )
     ''');
 
@@ -1159,9 +1165,10 @@ class DatabaseHelper {
 
   /// Returns missions filtered by crew membership.
   /// CRP (or empty name) always sees every mission.
-  /// All other roles see only missions where they appear in [crew_members].
+  /// All other roles see only missions where they appear in [crew_members]
+  /// matched by name **or** by their Supabase [userId] (Change 5).
   Future<List<Mission>> getMissionsForUser(
-      String userName, bool isCrp) async {
+      String userName, bool isCrp, {String userId = ''}) async {
     final db = await database;
     final List<Map<String, dynamic>> rows;
     if (isCrp || userName.trim().isEmpty) {
@@ -1171,14 +1178,30 @@ class DatabaseHelper {
         SELECT DISTINCT m.* FROM missions m
         INNER JOIN crew_members c ON c.mission_id = m.id
         WHERE c.name = ?
+          OR (c.user_id IS NOT NULL AND c.user_id != '' AND c.user_id = ?)
         ORDER BY m.date ASC
-      ''', [userName.trim()]);
+      ''', [userName.trim(), userId]);
     }
     final missions = rows.map(Mission.fromMap).toList();
     for (final m in missions) {
       m.crew = await getCrewForMission(m.id!);
     }
     return missions;
+  }
+
+  /// Returns the most recent battery log for a given aircraft, or null if none.
+  /// Used to show pre-flight battery status on MissionDetailsScreen.
+  Future<Map<String, dynamic>?> getLatestBatteryLogByAircraft(
+      int aircraftId) async {
+    final db = await database;
+    final rows = await db.query(
+      'battery_logs',
+      where: 'aircraft_id = ?',
+      whereArgs: [aircraftId],
+      orderBy: 'log_date DESC',
+      limit: 1,
+    );
+    return rows.isEmpty ? null : rows.first;
   }
 
   // ─── Stats ────────────────────────────────────────────────────────────────

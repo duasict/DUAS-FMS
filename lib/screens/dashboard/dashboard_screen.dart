@@ -5,6 +5,7 @@ import '../../providers/org_settings_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/stat_card.dart';
 import '../../widgets/mission_card.dart';
+import '../../widgets/skeleton_loader.dart';
 import '../mission_details/mission_details_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
@@ -59,8 +60,7 @@ class DashboardScreen extends StatelessWidget {
         ],
       ),
       body: provider.isLoading
-          ? Center(
-              child: CircularProgressIndicator(color: AppColors.primary))
+          ? const SkeletonDashboard()
           : RefreshIndicator(
               color: AppColors.primary,
               backgroundColor: context.colors.card,

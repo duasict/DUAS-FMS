@@ -30,6 +30,8 @@ dependencies:
   pdf: ^3.11.1
   printing: ^5.13.2
   qr_flutter: ^4.1.0
+  tflite_flutter: ^0.10.4
+  shimmer: ^3.0.0
 
 dev_dependencies:
   flutter_test:
@@ -53,3 +55,4 @@ flutter:
   uses-material-design: true
   assets:
     - assets/icons/
+    - assets/models/
