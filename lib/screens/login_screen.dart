@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../providers/org_settings_provider.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_constants.dart';
 import '../services/supabase_service.dart';
@@ -107,6 +109,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final org = context.watch<OrgSettingsProvider>();
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
@@ -133,7 +136,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      AppConstants.appName,
+                      org.appName,
                       style: TextStyle(
                         color: context.colors.textPrimary,
                         fontSize: 30,
@@ -142,7 +145,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     Text(
-                      AppConstants.appTagline,
+                      org.tagline,
                       style: TextStyle(
                         color: context.colors.textSecondary,
                         fontSize: 13,
@@ -281,7 +284,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     border: Border.all(color: context.colors.border),
                   ),
                   child: Text(
-                    '🔒  ${AppConstants.orgName}  ·  v${AppConstants.appVersion}',
+                    '🔒  ${org.orgName}  ·  v${AppConstants.appVersion}',
                     style: TextStyle(
                         color: context.colors.textMuted, fontSize: 11),
                   ),

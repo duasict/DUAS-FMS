@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'database/database_helper.dart';
 import 'providers/app_provider.dart';
+import 'providers/org_settings_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/user_profile_provider.dart';
 import 'screens/splash_screen.dart';
@@ -24,6 +25,7 @@ void main() async {
   runApp(
     MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (_) => OrgSettingsProvider()..load()),
         ChangeNotifierProvider(create: (_) => AppProvider()..initialize()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => UserProfileProvider()..load()),

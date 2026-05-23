@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../database/database_helper.dart';
 import '../../models/aircraft.dart';
+import '../../services/org_settings_service.dart';
+import '../../services/pdf_generator_service.dart';
 import '../../theme/app_theme.dart';
 
 class BatteryLogScreen extends StatefulWidget {
@@ -24,6 +26,7 @@ class _BatteryLogScreenState extends State<BatteryLogScreen> {
   String _status = 'good';
   bool _isLoading = true;
   bool _isSaving = false;
+  bool _isExporting = false;  // true while generating A-10 PDF
 
   static const _statuses = ['good', 'degraded', 'retired'];
 
@@ -113,10 +116,60 @@ class _BatteryLogScreenState extends State<BatteryLogScreen> {
     Navigator.pop(context);
   }
 
+  // ── Export Annex A-10 PDF ───────────────────────────────────────────────────
+
+  Future<void> _exportA10() async {
+    final battId = _batteryIdCtrl.text.trim();
+    setState(() => _isExporting = true);
+    try {
+      final allLogs = await DatabaseHelper.instance.getBatteryLogs();
+      final logs = battId.isEmpty
+          ? allLogs
+          : allLogs.where((l) => l['battery_id'] == battId).toList();
+      final label = battId.isEmpty ? 'All Batteries' : battId;
+      final org = await OrgSettingsService.load();
+      final bytes =
+          await PdfGeneratorService.generateBatteryLog(label, logs, org);
+      final safeId = label.replaceAll(RegExp(r'[^A-Za-z0-9]+'), '-');
+      await PdfGeneratorService.share(bytes, 'A10-BatteryLog-$safeId.pdf');
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Export failed: $e'),
+          backgroundColor: AppColors.danger,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _isExporting = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Battery Log')),
+      appBar: AppBar(
+        title: const Text('Battery Log'),
+        actions: [
+          if (_isExporting)
+            const Padding(
+              padding: EdgeInsets.only(right: 16),
+              child: Center(
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: AppColors.primaryLight),
+                ),
+              ),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.picture_as_pdf_outlined),
+              tooltip: 'Export Annex A-10 PDF',
+              onPressed: _isLoading ? null : _exportA10,
+            ),
+        ],
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
           : ListView(

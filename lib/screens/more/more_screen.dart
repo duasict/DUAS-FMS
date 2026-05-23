@@ -11,6 +11,10 @@ import '../incidents/incident_report_screen.dart';
 import '../license/license_verification_screen.dart';
 import '../login_screen.dart';
 import '../maintenance/maintenance_log_screen.dart';
+import 'about_screen.dart';
+import 'data_storage_screen.dart';
+import 'help_documentation_screen.dart';
+import 'notification_preferences_screen.dart';
 import 'profile_screen.dart';
 import 'settings_screen.dart';
 
@@ -123,13 +127,17 @@ class MoreScreen extends StatelessWidget {
             icon: Icons.notifications_outlined,
             title: 'Notification Preferences',
             subtitle: 'Manage alert settings',
-            onTap: () {},
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(
+                    builder: (_) => const NotificationPreferencesScreen())),
           ),
           _NavTile(
             icon: Icons.storage_outlined,
             title: 'Data & Storage',
             subtitle: 'Local storage and sync settings',
-            onTap: () {},
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(
+                    builder: (_) => const DataStorageScreen())),
           ),
           const SizedBox(height: 8),
           const _SectionLabel(label: 'RECORDS'),
@@ -161,13 +169,16 @@ class MoreScreen extends StatelessWidget {
             icon: Icons.help_outline,
             title: 'Help & Documentation',
             subtitle: 'UAS SOP and app guide',
-            onTap: () {},
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(
+                    builder: (_) => const HelpDocumentationScreen())),
           ),
           _NavTile(
             icon: Icons.info_outline,
             title: 'About',
             subtitle: 'UAS FMS v1.0.0',
-            onTap: () {},
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const AboutScreen())),
           ),
           const SizedBox(height: 8),
           const _SectionLabel(label: 'SESSION'),

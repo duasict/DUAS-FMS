@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../providers/org_settings_provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../providers/user_profile_provider.dart';
 import '../../theme/app_theme.dart';
+import '../onboarding/org_setup_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final isCrp = context.watch<UserProfileProvider>().profile.role == 'crp';
+    final org   = context.watch<OrgSettingsProvider>();
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
@@ -16,6 +21,22 @@ class SettingsScreen extends StatelessWidget {
           _sectionLabel(context, 'APPEARANCE'),
           const SizedBox(height: 8),
           _ThemeToggleTile(),
+          if (isCrp) ...[
+            const SizedBox(height: 20),
+            _sectionLabel(context, 'ORGANISATION'),
+            const SizedBox(height: 8),
+            _navTile(
+              context,
+              icon: Icons.business_outlined,
+              title: 'Organisation Settings',
+              subtitle: org.orgName,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const OrgSetupScreen(editMode: true)),
+              ),
+            ),
+          ],
           const SizedBox(height: 20),
           _sectionLabel(context, 'ABOUT'),
           const SizedBox(height: 8),
@@ -54,6 +75,46 @@ class SettingsScreen extends StatelessWidget {
           ),
         ),
       );
+
+  Widget _navTile(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 3),
+      decoration: BoxDecoration(
+        color: context.colors.card,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: context.colors.border),
+      ),
+      child: ListTile(
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: AppColors.primaryLight.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: AppColors.primaryLight, size: 18),
+        ),
+        title: Text(title,
+            style: TextStyle(
+                color: context.colors.textPrimary,
+                fontSize: 14,
+                fontWeight: FontWeight.w500)),
+        subtitle: Text(subtitle,
+            style: TextStyle(color: context.colors.textMuted, fontSize: 11)),
+        trailing:
+            Icon(Icons.chevron_right, color: context.colors.textMuted, size: 18),
+        onTap: onTap,
+        dense: true,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      ),
+    );
+  }
 
   Widget _infoTile(
     BuildContext context, {

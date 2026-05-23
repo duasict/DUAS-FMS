@@ -10,7 +10,7 @@ import '../models/flight_log.dart';
 import '../models/flight_plan.dart';
 import '../models/hira_row.dart';
 import '../models/user_profile.dart';
-import '../utils/app_constants.dart';
+import '../services/org_settings_service.dart';
 
 class DatabaseHelper {
   static const _dbName = 'uas_fms.db';
@@ -1135,13 +1135,38 @@ class DatabaseHelper {
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
   Future<String> nextMissionId() async {
-    final db = await database;
-    final year = DateTime.now().year;
-    final prefix = '${AppConstants.missionPrefix}-$year-';
+    final db    = await database;
+    final year  = DateTime.now().year;
+    final org   = await OrgSettingsService.load();
+    final prefix = '${org.missionPrefix}-$year-';
     final result = await db.rawQuery(
         "SELECT COUNT(*) as c FROM missions WHERE mission_id LIKE '$prefix%'");
     final count = ((result.first['c'] as int?) ?? 0) + 1;
     return '$prefix${count.toString().padLeft(3, '0')}';
+  }
+
+  /// Returns missions filtered by crew membership.
+  /// CRP (or empty name) always sees every mission.
+  /// All other roles see only missions where they appear in [crew_members].
+  Future<List<Mission>> getMissionsForUser(
+      String userName, bool isCrp) async {
+    final db = await database;
+    final List<Map<String, dynamic>> rows;
+    if (isCrp || userName.trim().isEmpty) {
+      rows = await db.query('missions', orderBy: 'date ASC');
+    } else {
+      rows = await db.rawQuery('''
+        SELECT DISTINCT m.* FROM missions m
+        INNER JOIN crew_members c ON c.mission_id = m.id
+        WHERE c.name = ?
+        ORDER BY m.date ASC
+      ''', [userName.trim()]);
+    }
+    final missions = rows.map(Mission.fromMap).toList();
+    for (final m in missions) {
+      m.crew = await getCrewForMission(m.id!);
+    }
+    return missions;
   }
 
   // ─── Stats ────────────────────────────────────────────────────────────────

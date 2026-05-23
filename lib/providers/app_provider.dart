@@ -64,11 +64,15 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> _loadAll() async {
-    final db = DatabaseHelper.instance;
-    _missions = await db.getMissions();
-    _aircraft = await db.getAircraft();
-    _alerts = await db.getAlerts();
-    _stats = await db.getStats();
+    final db      = DatabaseHelper.instance;
+    final profile = await db.getUserProfile();
+    _missions = await db.getMissionsForUser(
+      profile?.name ?? '',
+      profile?.role == 'crp',
+    );
+    _aircraft      = await db.getAircraft();
+    _alerts        = await db.getAlerts();
+    _stats         = await db.getStats();
     _unsyncedCount = await db.getUnsyncedCount();
   }
 
@@ -79,14 +83,19 @@ class AppProvider extends ChangeNotifier {
 
   Future<void> refreshAircraft() async {
     _aircraft = await DatabaseHelper.instance.getAircraft();
-    _stats = await DatabaseHelper.instance.getStats();
+    _stats    = await DatabaseHelper.instance.getStats();
     notifyListeners();
   }
 
   Future<void> refreshMissions() async {
-    _missions = await DatabaseHelper.instance.getMissions();
-    _stats = await DatabaseHelper.instance.getStats();
-    _unsyncedCount = await DatabaseHelper.instance.getUnsyncedCount();
+    final db      = DatabaseHelper.instance;
+    final profile = await db.getUserProfile();
+    _missions = await db.getMissionsForUser(
+      profile?.name ?? '',
+      profile?.role == 'crp',
+    );
+    _stats         = await db.getStats();
+    _unsyncedCount = await db.getUnsyncedCount();
     notifyListeners();
   }
 

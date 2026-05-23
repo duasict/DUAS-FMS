@@ -1,4 +1,5 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import '../screens/more/notification_preferences_screen.dart';
 
 class NotificationService {
   static final _plugin = FlutterLocalNotificationsPlugin();
@@ -20,6 +21,7 @@ class NotificationService {
 
   static Future<void> showConcurrenceRequest(
       String missionRef, String missionTitle) async {
+    if (!await NotifPrefs.get(NotifPrefs.kConcurrence)) return;
     await _show(
       id: missionRef.hashCode,
       title: 'CRP Concurrence Required',
@@ -31,6 +33,7 @@ class NotificationService {
 
   static Future<void> showConcurrenceResult(
       String missionRef, String status) async {
+    if (!await NotifPrefs.get(NotifPrefs.kConcurrence)) return;
     await _show(
       id: missionRef.hashCode + 1,
       title: 'Concurrence ${status == 'approved' ? 'Approved ✔' : 'Rejected ✖'}',
@@ -42,6 +45,7 @@ class NotificationService {
 
   static Future<void> showLicenseExpiry(
       String name, int daysLeft) async {
+    if (!await NotifPrefs.get(NotifPrefs.kLicense)) return;
     await _show(
       id: name.hashCode,
       title: 'License Expiring Soon',
@@ -50,6 +54,30 @@ class NotificationService {
       channelId: 'license',
       channelName: 'License Alerts',
     );
+  }
+
+  static Future<void> showMissionAssigned(
+      String missionRef, String missionTitle, String role) async {
+    if (!await NotifPrefs.get(NotifPrefs.kMissionAssigned)) return;
+    await _show(
+      id: '$missionRef-assign'.hashCode,
+      title: 'Mission Assignment — $missionRef',
+      body: 'You are assigned to "$missionTitle" as ${_roleLabelFor(role)}.',
+      channelId: 'mission',
+      channelName: 'Mission Assignments',
+    );
+  }
+
+  static String _roleLabelFor(String role) {
+    switch (role) {
+      case 'rpic': return 'RPIC (Remote Pilot in Command)';
+      case 'pic':  return 'Pilot in Command';
+      case 'vo':   return 'Visual Observer';
+      case 'gcs':  return 'GCS Operator';
+      case 'tech': return 'Technical Crew Member';
+      case 'crp':  return 'Chief Remote Pilot';
+      default:     return role.toUpperCase();
+    }
   }
 
   static Future<void> _show({

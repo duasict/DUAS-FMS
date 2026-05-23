@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../database/database_helper.dart';
 import '../../models/aircraft.dart';
+import '../../services/org_settings_service.dart';
+import '../../services/pdf_generator_service.dart';
 import '../../theme/app_theme.dart';
 
 class MaintenanceLogScreen extends StatefulWidget {
@@ -26,6 +28,7 @@ class _MaintenanceLogScreenState extends State<MaintenanceLogScreen> {
   String _airworthinessStatus = 'serviceable';
   bool _isLoading = true;
   bool _isSaving = false;
+  bool _isExporting = false;  // true while generating A-9 PDF
 
   static const _maintenanceTypes = [
     'scheduled', 'unscheduled', 'post-incident', 'inspection',
@@ -133,10 +136,70 @@ class _MaintenanceLogScreenState extends State<MaintenanceLogScreen> {
     Navigator.pop(context);
   }
 
+  // ── Export Annex A-9 PDF ────────────────────────────────────────────────────
+
+  Future<void> _exportA9() async {
+    if (_selectedAircraftId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select an aircraft to export its log.')),
+      );
+      return;
+    }
+    setState(() => _isExporting = true);
+    try {
+      final allLogs = await DatabaseHelper.instance.getMaintenanceLogs();
+      final logs = allLogs
+          .where((l) => l['aircraft_id'] == _selectedAircraftId)
+          .toList();
+      final aircraft =
+          _aircraft.firstWhere((a) => a.id == _selectedAircraftId);
+      final org = await OrgSettingsService.load();
+      final bytes = await PdfGeneratorService.generateMaintenanceLog(
+        aircraft.name,
+        aircraft.serialNumber,
+        logs,
+        org,
+      );
+      final safeName = aircraft.name.replaceAll(RegExp(r'[^A-Za-z0-9]+'), '-');
+      await PdfGeneratorService.share(bytes, 'A9-MaintenanceLog-$safeName.pdf');
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Export failed: $e'),
+          backgroundColor: AppColors.danger,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _isExporting = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Maintenance Log')),
+      appBar: AppBar(
+        title: const Text('Maintenance Log'),
+        actions: [
+          if (_isExporting)
+            const Padding(
+              padding: EdgeInsets.only(right: 16),
+              child: Center(
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: AppColors.primaryLight),
+                ),
+              ),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.picture_as_pdf_outlined),
+              tooltip: 'Export Annex A-9 PDF',
+              onPressed: _isLoading ? null : _exportA9,
+            ),
+        ],
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
           : ListView(

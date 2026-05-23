@@ -11,6 +11,7 @@ import '../fit_to_fly/fit_to_fly_screen.dart';
 import '../flight_log/flight_log_screen.dart';
 import '../flight_planning/flight_planning_screen.dart';
 import '../hira/hira_screen.dart';
+import '../reports/mission_reports_screen.dart';
 
 class MissionDetailsScreen extends StatefulWidget {
   final int missionId;
@@ -653,7 +654,13 @@ class _BottomAction extends StatelessWidget {
             width: double.infinity,
             height: 50,
             child: OutlinedButton.icon(
-              onPressed: () {},
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      MissionReportsScreen(mission: mission),
+                ),
+              ),
               icon: const Icon(Icons.description_outlined, size: 18),
               label: const Text('View Flight Report'),
             ),
