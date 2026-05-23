@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/mission.dart';
@@ -457,7 +458,7 @@ class DatabaseHelper {
       )
     ''');
 
-    await _seedData(db);
+    if (kDebugMode) await _seedData(db);
   }
 
   Future<void> _seedData(Database db) async {

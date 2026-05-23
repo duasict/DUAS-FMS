@@ -57,6 +57,15 @@ class _MissionCreateScreenState extends State<MissionCreateScreen> {
 
   static const _extraRoleOptions = ['vo', 'gcs', 'tech'];
 
+  static String _roleDisplay(String r) {
+    switch (r) {
+      case 'vo':   return 'Visual Observer';
+      case 'gcs':  return 'GCS Operator';
+      case 'tech': return 'Technical Crew Member';
+      default:     return r.toUpperCase();
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -481,7 +490,7 @@ class _MissionCreateScreenState extends State<MissionCreateScreen> {
                 items: _extraRoleOptions.map((r) {
                   return DropdownMenuItem<String>(
                     value: r,
-                    child: Text(r.toUpperCase()),
+                    child: Text(_roleDisplay(r)),
                   );
                 }).toList(),
                 onChanged: (v) => setState(() => _extraRoles[i] = v!),
