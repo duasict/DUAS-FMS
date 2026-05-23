@@ -173,6 +173,10 @@ class _MissionApprovalScreenState extends State<MissionApprovalScreen> {
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
         children: [
           _approvalHeader(m),
+          if (m.crpConcurrenceRequired) ...[
+            const SizedBox(height: 10),
+            _concurrenceStatusCard(m),
+          ],
           if (!_isOnline) ...[
             const SizedBox(height: 10),
             _p2pCard(m),
@@ -186,10 +190,85 @@ class _MissionApprovalScreenState extends State<MissionApprovalScreen> {
         ],
       ),
       bottomNavigationBar: MissionActionBar(
-        label: 'All crew briefed — Proceed to Equipment Check',
+        label: m.crpConcurrenceStatus == 'rejected'
+            ? 'CRP rejected — revise mission before proceeding'
+            : 'All crew briefed — Proceed to Equipment Check',
         isSaving: _isSaving,
-        onAction: _approve,
+        onAction: m.crpConcurrenceStatus == 'rejected' ? null : _approve,
       ),
+    );
+  }
+
+  /// Live concurrence status badge — updated as the P2P poll timer fires.
+  Widget _concurrenceStatusCard(Mission m) {
+    final status = m.crpConcurrenceStatus;
+    final isApproved = status == 'approved';
+    final isRejected = status == 'rejected';
+
+    final Color bg;
+    final Color fg;
+    final IconData icon;
+    final String headline;
+    final String body;
+
+    if (isApproved) {
+      bg = AppColors.success;
+      fg = AppColors.success;
+      icon = Icons.verified_outlined;
+      headline = 'CRP APPROVED';
+      body = 'Concurrence granted. You may proceed to equipment check.';
+    } else if (isRejected) {
+      bg = AppColors.danger;
+      fg = AppColors.danger;
+      icon = Icons.cancel_outlined;
+      headline = 'CRP REJECTED';
+      body = 'Mission rejected by CRP. Revise hazards or cancel before proceeding.';
+    } else {
+      bg = AppColors.warning;
+      fg = AppColors.warning;
+      icon = Icons.pending_actions_outlined;
+      headline = 'AWAITING CRP CONCURRENCE';
+      body = _p2pRunning
+          ? 'Waiting for CRP to review via P2P server…'
+          : 'HIGH RISK — CRP approval required. Start P2P server or ask CRP to approve via Alerts.';
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: bg.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: bg.withValues(alpha: 0.4)),
+      ),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _p2pRunning && !isApproved && !isRejected
+            ? SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: fg),
+              )
+            : Icon(icon, color: fg, size: 18),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(
+              headline,
+              style: TextStyle(
+                  color: fg,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.8),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              body,
+              style: TextStyle(
+                  color: fg, fontSize: 12, fontWeight: FontWeight.w500, height: 1.4),
+            ),
+          ]),
+        ),
+      ]),
     );
   }
 

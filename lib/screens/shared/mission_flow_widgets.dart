@@ -84,7 +84,8 @@ class MissionFlowCard extends StatelessWidget {
 class MissionActionBar extends StatelessWidget {
   final String label;
   final bool isSaving;
-  final VoidCallback onAction;
+  /// Null disables the button (e.g. when CRP has rejected the mission).
+  final VoidCallback? onAction;
   const MissionActionBar(
       {super.key,
       required this.label,
