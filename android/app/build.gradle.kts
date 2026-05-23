@@ -29,6 +29,14 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        // Only include the two ABIs we actually target:
+        //   arm64-v8a  — all modern Android devices (64-bit)
+        //   x86_64     — the Android Studio emulator
+        // Drops armeabi-v7a + x86 from the debug APK, cutting its size ~60 %.
+        ndk {
+            abiFilters += listOf("arm64-v8a", "x86_64")
+        }
     }
 
     buildTypes {
