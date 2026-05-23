@@ -3,6 +3,8 @@ import '../../database/database_helper.dart';
 import '../../models/flight_plan.dart';
 import '../../models/hira_row.dart';
 import '../../models/mission.dart';
+import '../../services/p2p_concurrence_service.dart';
+import '../../services/sync_service.dart';
 import '../../theme/app_theme.dart';
 import '../equipment_checklist/equipment_checklist_screen.dart';
 import '../shared/mission_flow_widgets.dart';
@@ -22,10 +24,42 @@ class _MissionApprovalScreenState extends State<MissionApprovalScreen> {
   bool _isLoading = true;
   bool _isSaving = false;
 
+  // P2P offline concurrence
+  bool _isOnline = true;
+  bool _p2pRunning = false;
+  String _p2pIp = '';
+
   @override
   void initState() {
     super.initState();
     _load();
+    _checkConnectivity();
+  }
+
+  Future<void> _checkConnectivity() async {
+    final online = await SyncService.isConnected();
+    if (mounted) setState(() => _isOnline = online);
+  }
+
+  Future<void> _startP2p() async {
+    final m = _mission;
+    if (m == null) return;
+    final ip = await P2pConcurrenceService.startServer(
+      missionId: widget.missionId,
+      missionRef: m.missionId,
+      missionTitle: m.title,
+    );
+    if (mounted) {
+      setState(() {
+        _p2pRunning = P2pConcurrenceService.isRunning;
+        _p2pIp = ip ?? '';
+      });
+    }
+  }
+
+  Future<void> _stopP2p() async {
+    await P2pConcurrenceService.stopServer();
+    if (mounted) setState(() => _p2pRunning = false);
   }
 
   Future<void> _load() async {
@@ -102,6 +136,10 @@ class _MissionApprovalScreenState extends State<MissionApprovalScreen> {
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
         children: [
           _approvalHeader(m),
+          if (!_isOnline) ...[
+            const SizedBox(height: 10),
+            _p2pCard(m),
+          ],
           const SizedBox(height: 10),
           _missionInfoCard(m),
           if (_flightPlan != null) _flightPlanCard(_flightPlan!),
@@ -115,6 +153,81 @@ class _MissionApprovalScreenState extends State<MissionApprovalScreen> {
         isSaving: _isSaving,
         onAction: _approve,
       ),
+    );
+  }
+
+  Widget _p2pCard(Mission m) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.4)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Row(children: [
+          Icon(Icons.wifi_off, color: AppColors.warning, size: 15),
+          SizedBox(width: 7),
+          Text('OFFLINE CRP APPROVAL',
+              style: TextStyle(
+                  color: AppColors.warning,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.8)),
+        ]),
+        const SizedBox(height: 8),
+        const Text(
+          'No internet connection. Start a local Wi-Fi hotspot server so the CRP can approve via their browser.',
+          style: TextStyle(color: AppColors.warning, fontSize: 12, height: 1.4),
+        ),
+        const SizedBox(height: 10),
+        if (!_p2pRunning)
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _startP2p,
+              icon: const Icon(Icons.wifi_tethering, size: 16),
+              label: const Text('Start P2P Server'),
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.warning),
+            ),
+          )
+        else ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.success.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+            ),
+            child: Row(children: [
+              const Icon(Icons.check_circle_outline,
+                  color: AppColors.success, size: 14),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'http://$_p2pIp:7788/concurrence',
+                  style: const TextStyle(
+                      color: AppColors.success,
+                      fontSize: 12,
+                      fontFamily: 'monospace'),
+                ),
+              ),
+            ]),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _stopP2p,
+              icon: const Icon(Icons.stop_circle_outlined, size: 16),
+              label: const Text('Stop Server'),
+              style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.danger,
+                  side: const BorderSide(color: AppColors.danger)),
+            ),
+          ),
+        ],
+      ]),
     );
   }
 
