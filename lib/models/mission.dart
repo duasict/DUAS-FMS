@@ -20,6 +20,8 @@ class Mission {
   // CRP concurrence fields (replaces approved_by + hazard_risk + risk_level)
   String crpAdvisoryNotes;
   bool crpConcurrenceRequired;
+  /// '' = not yet reviewed  |  'approved' = CRP approved  |  'rejected' = CRP rejected
+  String crpConcurrenceStatus;
 
   String organizationId; // Supabase org UUID (empty = not linked yet)
   String? createdBy;     // Supabase user UUID of CRP who created this
@@ -56,6 +58,7 @@ class Mission {
     this.duration,
     this.crpAdvisoryNotes = '',
     this.crpConcurrenceRequired = false,
+    this.crpConcurrenceStatus = '',
     this.organizationId = '',
     this.createdBy,
     this.hasFlightPlanComplete = false,
@@ -94,6 +97,7 @@ class Mission {
       duration: map['duration'] as int?,
       crpAdvisoryNotes: map['crp_advisory_notes'] as String? ?? '',
       crpConcurrenceRequired: (map['crp_concurrence_required'] as int?) == 1,
+      crpConcurrenceStatus: map['crp_concurrence_status'] as String? ?? '',
       organizationId: map['organization_id'] as String? ?? '',
       createdBy: map['created_by'] as String?,
       hasFlightPlanComplete: (map['has_flight_plan_complete'] as int?) == 1,
@@ -132,6 +136,7 @@ class Mission {
       'duration': duration,
       'crp_advisory_notes': crpAdvisoryNotes,
       'crp_concurrence_required': crpConcurrenceRequired ? 1 : 0,
+      'crp_concurrence_status': crpConcurrenceStatus,
       'organization_id': organizationId,
       'created_by': createdBy,
       'has_flight_plan_complete': hasFlightPlanComplete ? 1 : 0,

@@ -133,8 +133,7 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
 
           // CRP concurrence banner
           if (m.crpConcurrenceRequired)
-            _ConcurrenceBanner(
-                pending: true), // TODO: show actual approval status
+            _ConcurrenceBanner(status: m.crpConcurrenceStatus),
           if (m.crpAdvisoryNotes.isNotEmpty)
             _CrpAdvisoryCard(notes: m.crpAdvisoryNotes),
 
@@ -237,32 +236,72 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
 // ── CRP Concurrence Banner ────────────────────────────────────────────────────
 
 class _ConcurrenceBanner extends StatelessWidget {
-  final bool pending;
-  const _ConcurrenceBanner({required this.pending});
+  /// '' or 'pending' = awaiting approval  |  'approved'  |  'rejected'
+  final String status;
+  const _ConcurrenceBanner({required this.status});
 
   @override
   Widget build(BuildContext context) {
+    final isApproved = status == 'approved';
+    final isRejected = status == 'rejected';
+
+    final Color bg;
+    final Color border;
+    final Color fg;
+    final IconData icon;
+    final String headline;
+    final String body;
+
+    if (isApproved) {
+      bg = AppColors.success.withValues(alpha: 0.08);
+      border = AppColors.success.withValues(alpha: 0.4);
+      fg = AppColors.success;
+      icon = Icons.verified_outlined;
+      headline = 'CRP APPROVED';
+      body = 'CRP concurrence has been granted. Proceed with operations.';
+    } else if (isRejected) {
+      bg = AppColors.danger.withValues(alpha: 0.12);
+      border = AppColors.danger.withValues(alpha: 0.6);
+      fg = AppColors.danger;
+      icon = Icons.cancel_outlined;
+      headline = 'CRP REJECTED';
+      body = 'This mission was rejected by the CRP. Revise or cancel before proceeding.';
+    } else {
+      bg = AppColors.warning.withValues(alpha: 0.08);
+      border = AppColors.warning.withValues(alpha: 0.4);
+      fg = AppColors.warning;
+      icon = Icons.pending_actions_outlined;
+      headline = 'CRP CONCURRENCE REQUIRED';
+      body = 'HIGH RISK — awaiting CRP approval before operations. HIRA residual risk ≥ 9.';
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.danger.withValues(alpha: 0.08),
+        color: bg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.danger.withValues(alpha: 0.4)),
+        border: Border.all(color: border),
       ),
-      child: const Row(children: [
-        Icon(Icons.warning, color: AppColors.danger, size: 18),
-        SizedBox(width: 10),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Icon(icon, color: fg, size: 18),
+        const SizedBox(width: 10),
         Expanded(
-          child: Text(
-            'HIGH RISK — CRP concurrence required before operations. '
-            'HIRA residual risk ≥ 9.',
-            style: TextStyle(
-                color: AppColors.danger,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                height: 1.4),
-          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(headline,
+                style: TextStyle(
+                    color: fg,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.8)),
+            const SizedBox(height: 3),
+            Text(body,
+                style: TextStyle(
+                    color: fg,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    height: 1.4)),
+          ]),
         ),
       ]),
     );

@@ -82,12 +82,19 @@ class _MissionApprovalScreenState extends State<MissionApprovalScreen> {
     setState(() => _isSaving = true);
     final navigator = Navigator.of(context);
 
+    // Persist CRP approval status on the mission record
+    final m = _mission;
+    if (m != null) {
+      m.crpConcurrenceStatus = 'approved';
+      await DatabaseHelper.instance.updateMission(m);
+    }
+
     if (!mounted) return;
     setState(() => _isSaving = false);
     navigator.push(MaterialPageRoute(
       builder: (_) => EquipmentChecklistScreen(
         missionId: widget.missionId,
-        missionTitle: _mission?.title ?? '',
+        missionTitle: m?.title ?? '',
       ),
     ));
   }

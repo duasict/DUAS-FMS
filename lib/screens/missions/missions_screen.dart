@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/app_provider.dart';
+import '../../providers/user_profile_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/mission_card.dart';
 import '../mission_details/mission_details_screen.dart';
@@ -32,20 +33,26 @@ class MissionsScreen extends StatelessWidget {
             _MissionList(filter: 'completed'),
           ],
         ),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: () {
-            final provider = context.read<AppProvider>();
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => const MissionCreateScreen()),
-            ).then((_) => provider.refreshMissions());
-          },
-          icon: const Icon(Icons.add, size: 20),
-          label: const Text('New Mission'),
-          backgroundColor: AppColors.primary,
-          foregroundColor: Colors.white,
-        ),
+        floatingActionButton: context
+                    .watch<UserProfileProvider>()
+                    .profile
+                    .role ==
+                'crp'
+            ? FloatingActionButton.extended(
+                onPressed: () {
+                  final provider = context.read<AppProvider>();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const MissionCreateScreen()),
+                  ).then((_) => provider.refreshMissions());
+                },
+                icon: const Icon(Icons.add, size: 20),
+                label: const Text('New Mission'),
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+              )
+            : null,
       ),
     );
   }
@@ -68,6 +75,17 @@ class _MissionList extends StatelessWidget {
     }
 
     if (missions.isEmpty) {
+      final isCrp = context
+              .watch<UserProfileProvider>()
+              .profile
+              .role ==
+          'crp';
+      final emptyMsg = filter == 'upcoming'
+          ? (isCrp
+              ? 'No upcoming missions.\nTap + to create one.'
+              : 'No missions assigned to you yet.')
+          : 'No completed missions yet.';
+
       return Center(
         child: Padding(
           padding: EdgeInsets.all(32),
@@ -83,9 +101,8 @@ class _MissionList extends StatelessWidget {
               ),
               SizedBox(height: 16),
               Text(
-                filter == 'upcoming'
-                    ? 'No upcoming missions.'
-                    : 'No completed missions yet.',
+                emptyMsg,
+                textAlign: TextAlign.center,
                 style: TextStyle(
                     color: context.colors.textSecondary, fontSize: 15),
               ),

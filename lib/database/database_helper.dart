@@ -14,7 +14,7 @@ import '../services/org_settings_service.dart';
 
 class DatabaseHelper {
   static const _dbName = 'uas_fms.db';
-  static const _dbVersion = 6;
+  static const _dbVersion = 7;
 
   DatabaseHelper._();
   static final DatabaseHelper instance = DatabaseHelper._();
@@ -210,6 +210,11 @@ class DatabaseHelper {
       // Migrate legacy 'rpic' profile roles → 'pic'
       await db.execute("UPDATE user_profile SET role = 'pic' WHERE role = 'rpic'");
     }
+    if (oldVersion < 7) {
+      // ── missions: add crp_concurrence_status for tracking CRP approval
+      await db.execute(
+          "ALTER TABLE missions ADD COLUMN crp_concurrence_status TEXT NOT NULL DEFAULT ''");
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -232,6 +237,7 @@ class DatabaseHelper {
         duration INTEGER,
         crp_advisory_notes TEXT NOT NULL DEFAULT '',
         crp_concurrence_required INTEGER NOT NULL DEFAULT 0,
+        crp_concurrence_status TEXT NOT NULL DEFAULT '',
         organization_id TEXT NOT NULL DEFAULT '',
         created_by TEXT,
         has_flight_plan_complete INTEGER DEFAULT 0,

@@ -6,11 +6,11 @@ import '../../providers/user_profile_provider.dart';
 import '../../services/supabase_service.dart';
 import '../../theme/app_theme.dart';
 import '../aircraft/aircraft_screen.dart';
-import '../battery/battery_log_screen.dart';
-import '../incidents/incident_report_screen.dart';
+import '../battery/battery_history_screen.dart';
+import '../incidents/incident_history_screen.dart';
 import '../license/license_verification_screen.dart';
 import '../login_screen.dart';
-import '../maintenance/maintenance_log_screen.dart';
+import '../maintenance/maintenance_history_screen.dart';
 import 'about_screen.dart';
 import 'data_storage_screen.dart';
 import 'help_documentation_screen.dart';
@@ -144,24 +144,24 @@ class MoreScreen extends StatelessWidget {
           _NavTile(
             icon: Icons.build_outlined,
             title: 'Maintenance Log',
-            subtitle: 'Log airframe maintenance and inspections',
+            subtitle: 'View history and log airframe maintenance',
             onTap: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const MaintenanceLogScreen())),
+                MaterialPageRoute(builder: (_) => const MaintenanceHistoryScreen())),
           ),
           _NavTile(
             icon: Icons.battery_charging_full,
             title: 'Battery Log',
-            subtitle: 'Track battery cycles, voltage, and status',
+            subtitle: 'View history and track battery cycles',
             onTap: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const BatteryLogScreen())),
+                MaterialPageRoute(builder: (_) => const BatteryHistoryScreen())),
           ),
           _NavTile(
             icon: Icons.warning_amber_outlined,
             title: 'Incident Report',
-            subtitle: 'File CAAP incident/near-miss reports',
+            subtitle: 'View history and file CAAP reports',
             iconColor: AppColors.warning,
             onTap: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const IncidentReportScreen())),
+                MaterialPageRoute(builder: (_) => const IncidentHistoryScreen())),
           ),
           const SizedBox(height: 8),
           const _SectionLabel(label: 'SUPPORT'),
