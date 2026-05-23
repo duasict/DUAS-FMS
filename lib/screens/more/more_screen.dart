@@ -6,8 +6,11 @@ import '../../providers/user_profile_provider.dart';
 import '../../services/supabase_service.dart';
 import '../../theme/app_theme.dart';
 import '../aircraft/aircraft_screen.dart';
+import '../battery/battery_log_screen.dart';
+import '../incidents/incident_report_screen.dart';
 import '../license/license_verification_screen.dart';
 import '../login_screen.dart';
+import '../maintenance/maintenance_log_screen.dart';
 import 'profile_screen.dart';
 import 'settings_screen.dart';
 
@@ -127,6 +130,30 @@ class MoreScreen extends StatelessWidget {
             title: 'Data & Storage',
             subtitle: 'Local storage and sync settings',
             onTap: () {},
+          ),
+          const SizedBox(height: 8),
+          const _SectionLabel(label: 'RECORDS'),
+          _NavTile(
+            icon: Icons.build_outlined,
+            title: 'Maintenance Log',
+            subtitle: 'Log airframe maintenance and inspections',
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const MaintenanceLogScreen())),
+          ),
+          _NavTile(
+            icon: Icons.battery_charging_full,
+            title: 'Battery Log',
+            subtitle: 'Track battery cycles, voltage, and status',
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const BatteryLogScreen())),
+          ),
+          _NavTile(
+            icon: Icons.warning_amber_outlined,
+            title: 'Incident Report',
+            subtitle: 'File CAAP incident/near-miss reports',
+            iconColor: AppColors.warning,
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const IncidentReportScreen())),
           ),
           const SizedBox(height: 8),
           const _SectionLabel(label: 'SUPPORT'),

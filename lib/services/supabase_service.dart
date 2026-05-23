@@ -115,4 +115,15 @@ class SupabaseService {
       client
           .from('flight_logs')
           .upsert(data, onConflict: 'mission_id');
+
+  // ── Standalone Logs ───────────────────────────────────────────────────────
+
+  static Future<void> upsertMaintenanceLogs(List<Map<String, dynamic>> rows) =>
+      client.from('maintenance_logs').upsert(rows);
+
+  static Future<void> upsertBatteryLogs(List<Map<String, dynamic>> rows) =>
+      client.from('battery_logs').upsert(rows);
+
+  static Future<void> upsertIncidentReports(List<Map<String, dynamic>> rows) =>
+      client.from('incident_reports').upsert(rows);
 }

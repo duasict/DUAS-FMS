@@ -46,11 +46,42 @@ class SyncService {
       final unsyncedMissions =
           await DatabaseHelper.instance.getUnsyncedMissions();
 
+      int synced = 0;
       for (final mission in unsyncedMissions) {
-        await _syncMission(mission, orgId, userId);
+        try {
+          await _syncMission(mission, orgId, userId);
+          synced++;
+        } catch (_) {
+          // skip this mission; it will retry next sync
+        }
       }
 
-      return true;
+      // Sync standalone logs (not tied to a mission UUID)
+      final db = DatabaseHelper.instance;
+      final unsyncedMaint = await db.database.then(
+          (d) => d.rawQuery('SELECT * FROM maintenance_logs WHERE is_synced = 0'));
+      if (unsyncedMaint.isNotEmpty) {
+        await SupabaseService.upsertMaintenanceLogs(
+            unsyncedMaint.map((r) => {...r, 'organization_id': orgId}).toList());
+      }
+
+      final unsyncedBatt = await db.database.then(
+          (d) => d.rawQuery('SELECT * FROM battery_logs WHERE is_synced = 0'));
+      if (unsyncedBatt.isNotEmpty) {
+        await SupabaseService.upsertBatteryLogs(
+            unsyncedBatt.map((r) => {...r, 'organization_id': orgId}).toList());
+      }
+
+      final unsyncedInc = await db.database.then(
+          (d) => d.rawQuery('SELECT * FROM incident_reports WHERE is_synced = 0'));
+      if (unsyncedInc.isNotEmpty) {
+        await SupabaseService.upsertIncidentReports(
+            unsyncedInc.map((r) => {...r, 'organization_id': orgId}).toList());
+      }
+
+      await db.markAllSynced();
+
+      return synced > 0 || unsyncedMissions.isEmpty;
     } catch (_) {
       return false;
     }

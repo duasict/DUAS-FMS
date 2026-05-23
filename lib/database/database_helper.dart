@@ -1016,7 +1016,10 @@ class DatabaseHelper {
   Future<int> getUnsyncedCount() async {
     final db = await database;
     int total = 0;
-    for (final table in ['missions', 'alerts', 'flight_logs']) {
+    for (final table in [
+      'missions', 'alerts', 'flight_logs',
+      'maintenance_logs', 'battery_logs', 'incident_reports',
+    ]) {
       final result = await db
           .rawQuery('SELECT COUNT(*) as c FROM $table WHERE is_synced = 0');
       total += (result.first['c'] as int? ?? 0);
@@ -1027,10 +1030,49 @@ class DatabaseHelper {
   Future<void> markAllSynced() async {
     final db = await database;
     final batch = db.batch();
-    for (final table in ['missions', 'alerts', 'flight_logs']) {
+    for (final table in [
+      'missions', 'alerts', 'flight_logs',
+      'maintenance_logs', 'battery_logs', 'incident_reports',
+    ]) {
       batch.update(table, {'is_synced': 1}, where: 'is_synced = 0');
     }
     await batch.commit(noResult: true);
+  }
+
+  // ─── Maintenance Logs ─────────────────────────────────────────────────────
+
+  Future<int> insertMaintenanceLog(Map<String, dynamic> data) async {
+    final db = await database;
+    return db.insert('maintenance_logs', data);
+  }
+
+  Future<List<Map<String, dynamic>>> getMaintenanceLogs() async {
+    final db = await database;
+    return db.query('maintenance_logs', orderBy: 'maintenance_date DESC');
+  }
+
+  // ─── Battery Logs ─────────────────────────────────────────────────────────
+
+  Future<int> insertBatteryLog(Map<String, dynamic> data) async {
+    final db = await database;
+    return db.insert('battery_logs', data);
+  }
+
+  Future<List<Map<String, dynamic>>> getBatteryLogs() async {
+    final db = await database;
+    return db.query('battery_logs', orderBy: 'log_date DESC');
+  }
+
+  // ─── Incident Reports ─────────────────────────────────────────────────────
+
+  Future<int> insertIncidentReport(Map<String, dynamic> data) async {
+    final db = await database;
+    return db.insert('incident_reports', data);
+  }
+
+  Future<List<Map<String, dynamic>>> getIncidentReports() async {
+    final db = await database;
+    return db.query('incident_reports', orderBy: 'incident_date DESC');
   }
 
   // ─── Flight Plans ─────────────────────────────────────────────────────────
