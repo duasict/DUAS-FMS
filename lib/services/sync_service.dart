@@ -62,21 +62,21 @@ class SyncService {
           (d) => d.rawQuery('SELECT * FROM maintenance_logs WHERE is_synced = 0'));
       if (unsyncedMaint.isNotEmpty) {
         await SupabaseService.upsertMaintenanceLogs(
-            unsyncedMaint.map((r) => {...r, 'organization_id': orgId}).toList());
+            unsyncedMaint.map((r) => _cleanLogRow(r, orgId)).toList());
       }
 
       final unsyncedBatt = await db.database.then(
           (d) => d.rawQuery('SELECT * FROM battery_logs WHERE is_synced = 0'));
       if (unsyncedBatt.isNotEmpty) {
         await SupabaseService.upsertBatteryLogs(
-            unsyncedBatt.map((r) => {...r, 'organization_id': orgId}).toList());
+            unsyncedBatt.map((r) => _cleanLogRow(r, orgId)).toList());
       }
 
       final unsyncedInc = await db.database.then(
           (d) => d.rawQuery('SELECT * FROM incident_reports WHERE is_synced = 0'));
       if (unsyncedInc.isNotEmpty) {
         await SupabaseService.upsertIncidentReports(
-            unsyncedInc.map((r) => {...r, 'organization_id': orgId}).toList());
+            unsyncedInc.map((r) => _cleanLogRow(r, orgId)).toList());
       }
 
       await db.markAllSynced();
@@ -85,6 +85,35 @@ class SyncService {
     } catch (_) {
       return false;
     }
+  }
+
+  // ── Standalone log row cleaner ────────────────────────────────────────────
+
+  /// Strips local-only and type-incompatible fields before pushing a
+  /// maintenance / battery / incident row to Supabase.
+  ///
+  /// Local SQLite rows carry:
+  ///   • `id`          — INTEGER PK; Supabase uses UUID (auto-generated)
+  ///   • `is_synced`   — local-only flag; column doesn't exist in Supabase
+  ///   • `aircraft_id` — local INTEGER; Supabase expects UUID (nullable)
+  ///   • `mission_id`  — local INTEGER; Supabase expects UUID (nullable)
+  ///   • `reporter_id` / `technician_id` — same issue
+  ///
+  /// We clear the UUID-ref columns to null rather than dropping them so
+  /// Supabase receives an explicit null and doesn't reject missing keys.
+  static Map<String, dynamic> _cleanLogRow(
+      Map<String, dynamic> r, String orgId) {
+    final m = Map<String, dynamic>.from(r);
+    // Remove local-only columns that don't exist in Supabase
+    m.remove('id');
+    m.remove('is_synced');
+    // Clear local integer FKs — they are not valid Supabase UUIDs
+    for (final k in ['aircraft_id', 'mission_id', 'reporter_id',
+                     'technician_id']) {
+      if (m.containsKey(k)) m[k] = null;
+    }
+    m['organization_id'] = orgId;
+    return m;
   }
 
   // ── Per-mission sync ──────────────────────────────────────────────────────

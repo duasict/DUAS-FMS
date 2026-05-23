@@ -113,6 +113,8 @@ CREATE TABLE IF NOT EXISTS public.missions (
   duration                  INT4,                     -- total flight minutes
   crp_advisory_notes        TEXT NOT NULL DEFAULT '',
   crp_concurrence_required  BOOLEAN NOT NULL DEFAULT FALSE,
+  -- '' = not yet reviewed | 'approved' = CRP approved | 'rejected' = CRP rejected
+  crp_concurrence_status    TEXT NOT NULL DEFAULT '',
   created_by                UUID REFERENCES public.profiles(id),
   organization_id           UUID REFERENCES public.organizations(id),
   -- Step completion flags
@@ -432,8 +434,11 @@ CREATE POLICY "org_select" ON public.organizations
 
 -- ── Profiles: users see own org; users update only their own row ──────────────
 DROP POLICY IF EXISTS "profiles_select" ON public.profiles;
+-- Allow: (1) users in the same org to see each other's profiles, AND
+--        (2) a user to always read their own profile even before org assignment
+--            (bootstrap: new user's organization_id is empty until the CRP sets it)
 CREATE POLICY "profiles_select" ON public.profiles
-  FOR SELECT USING (organization_id = public.my_org_id());
+  FOR SELECT USING (organization_id = public.my_org_id() OR id = auth.uid());
 
 DROP POLICY IF EXISTS "profiles_insert_own" ON public.profiles;
 CREATE POLICY "profiles_insert_own" ON public.profiles
