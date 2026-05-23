@@ -50,22 +50,26 @@ class AppProvider extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
-    _isOnline = await SyncService.isConnected();
-    _connectivitySub =
-        SyncService.connectivityStream.listen((results) async {
-      final wasOnline = _isOnline;
-      _isOnline = results.any((r) =>
-          r == ConnectivityResult.wifi || r == ConnectivityResult.mobile);
-      if (!wasOnline && _isOnline && _unsyncedCount > 0) {
-        await syncData();
-      }
+    try {
+      _isOnline = await SyncService.isConnected();
+      _connectivitySub =
+          SyncService.connectivityStream.listen((results) async {
+        final wasOnline = _isOnline;
+        _isOnline = results.any((r) =>
+            r == ConnectivityResult.wifi || r == ConnectivityResult.mobile);
+        if (!wasOnline && _isOnline && _unsyncedCount > 0) {
+          await syncData();
+        }
+        notifyListeners();
+      });
+
+      await _loadAll();
+    } catch (e, st) {
+      debugPrint('[AppProvider] initialize error: $e\n$st');
+    } finally {
+      _isLoading = false;
       notifyListeners();
-    });
-
-    await _loadAll();
-
-    _isLoading = false;
-    notifyListeners();
+    }
   }
 
   Future<void> _loadAll() async {

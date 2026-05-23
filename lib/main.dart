@@ -19,7 +19,9 @@ void main() async {
   // Initialize local notifications
   await NotificationService.initialize();
 
-  // Initialize local SQLite DB
+  // Pre-warm the encrypted SQLite DB before the first frame.
+  // sqflite_sqlcipher runs the KDF on its own native background thread, so
+  // this only costs the Keystore lookup (~1 ms) on the Dart main isolate.
   await DatabaseHelper.instance.database;
 
   runApp(
