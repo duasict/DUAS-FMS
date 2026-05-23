@@ -7,6 +7,7 @@ import '../../providers/app_provider.dart';
 import '../../providers/user_profile_provider.dart';
 import '../../theme/app_theme.dart';
 import '../checklists/inflight_checklist_screen.dart';
+import '../missions/mission_edit_screen.dart';
 import '../checklists/postflight_checklist_screen.dart';
 import '../checklists/preflight_checklist_screen.dart';
 import '../equipment_checklist/equipment_checklist_screen.dart';
@@ -136,7 +137,15 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
     if (confirmed != true || !mounted) return;
 
     m.status = 'cancelled';
-    await context.read<AppProvider>().updateMission(m);
+    final err = await context.read<AppProvider>().updateMission(m);
+    if (!mounted) return;
+    if (err != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(err),
+        backgroundColor: AppColors.danger,
+      ));
+      return;
+    }
     await _load();
   }
 
@@ -154,12 +163,23 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
 
     final isCrp = context.watch<UserProfileProvider>().profile.role == 'crp';
     final canCancel = isCrp && !m.isCompleted && !m.isCancelled;
+    final canEdit   = isCrp && m.isPlanning;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(m.missionId,
             style: const TextStyle(fontFamily: 'monospace', fontSize: 16)),
         actions: [
+          if (canEdit)
+            IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              tooltip: 'Edit Mission',
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => MissionEditScreen(mission: m)),
+              ).then((changed) { if (changed == true) _load(); }),
+            ),
           Container(
             margin: EdgeInsets.only(right: canCancel ? 4 : 14),
             padding:

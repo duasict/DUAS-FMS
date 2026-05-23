@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as io;
@@ -24,6 +25,7 @@ class P2pConcurrenceService {
 
     final router = Router()
       ..get('/', _handleRoot)
+      ..get('/missions', _handleGetMissions)
       ..get('/concurrence', _handleGet)
       ..post('/concurrence/approve', _handleApprove)
       ..post('/concurrence/reject', _handleReject);
@@ -58,9 +60,51 @@ class P2pConcurrenceService {
   static Response _handleRoot(Request req) {
     return Response.ok(
       _html('DUAS FMS P2P',
-          '<p>Visit <a href="/concurrence">/concurrence</a> to review the mission.</p>'),
+          '<p>Routes:<br>'
+          '&bull; <a href="/missions">GET /missions</a> — JSON list of all missions<br>'
+          '&bull; <a href="/concurrence">GET /concurrence</a> — review active mission</p>'),
       headers: {'content-type': 'text/html'},
     );
+  }
+
+  /// Returns a JSON array of all missions visible to the current user.
+  /// Intended for CRP-side tooling / offline sync over the LAN.
+  static Future<Response> _handleGetMissions(Request req) async {
+    try {
+      final db      = DatabaseHelper.instance;
+      final profile = await db.getUserProfile();
+      final missions = await db.getMissionsForUser(
+        profile?.name ?? '',
+        profile?.role == 'crp',
+        userId: profile?.supabaseId ?? '',
+      );
+      final payload = missions.map((m) => {
+        'id':                      m.id,
+        'mission_id':              m.missionId,
+        'title':                   m.title,
+        'status':                  m.status,
+        'date':                    m.date,
+        'time':                    m.timeStr,
+        'location':                m.location,
+        'environment':             m.environment,
+        'aircraft':                m.aircraftName,
+        'aircraft_type':           m.aircraftType,
+        'duration_min':            m.duration,
+        'crp_concurrence_required': m.crpConcurrenceRequired,
+        'crp_concurrence_status':  m.crpConcurrenceStatus,
+        'crew': m.crew.map((c) => {'name': c.name, 'role': c.role}).toList(),
+      }).toList();
+      return Response.ok(
+        jsonEncode(payload),
+        headers: {
+          'content-type': 'application/json',
+          'access-control-allow-origin': '*',
+        },
+      );
+    } catch (e) {
+      return Response.internalServerError(body: jsonEncode({'error': '$e'}),
+          headers: {'content-type': 'application/json'});
+    }
   }
 
   static Future<Response> _handleGet(Request req) async {

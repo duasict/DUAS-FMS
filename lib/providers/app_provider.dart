@@ -18,6 +18,11 @@ class AppProvider extends ChangeNotifier {
   bool _isOnline = false;
   int _unsyncedCount = 0;
 
+  // ── Pagination ──────────────────────────────────────────────────────────────
+  static const _pageSize = 20;
+  bool _hasMoreMissions = false;
+  bool get hasMoreMissions => _hasMoreMissions;
+
   StreamSubscription? _connectivitySub;
 
   List<Mission> get missions => _missions;
@@ -66,15 +71,20 @@ class AppProvider extends ChangeNotifier {
   Future<void> _loadAll() async {
     final db      = DatabaseHelper.instance;
     final profile = await db.getUserProfile();
-    _missions = await db.getMissionsForUser(
+    // Load first page; subsequent pages via loadMoreMissions()
+    final firstPage = await db.getMissionsForUserPaged(
       profile?.name ?? '',
       profile?.role == 'crp',
       userId: profile?.supabaseId ?? '',
+      limit: _pageSize,
+      offset: 0,
     );
-    _aircraft      = await db.getAircraft();
-    _alerts        = await db.getAlerts();
-    _stats         = await db.getStats();
-    _unsyncedCount = await db.getUnsyncedCount();
+    _missions         = firstPage;
+    _hasMoreMissions  = firstPage.length >= _pageSize;
+    _aircraft         = await db.getAircraft();
+    _alerts           = await db.getAlerts();
+    _stats            = await db.getStats();
+    _unsyncedCount    = await db.getUnsyncedCount();
   }
 
   Future<void> refresh() async {
@@ -91,11 +101,19 @@ class AppProvider extends ChangeNotifier {
   Future<void> refreshMissions() async {
     final db      = DatabaseHelper.instance;
     final profile = await db.getUserProfile();
-    _missions = await db.getMissionsForUser(
+    // On explicit refresh: reload all previously-loaded pages in one go so
+    // any edited / newly-created mission appears immediately.
+    final count   = _missions.length < _pageSize ? _pageSize : _missions.length;
+    final reloaded = await db.getMissionsForUserPaged(
       profile?.name ?? '',
       profile?.role == 'crp',
       userId: profile?.supabaseId ?? '',
+      limit: count,
+      offset: 0,
     );
+    _missions      = reloaded;
+    // Re-evaluate whether more pages exist
+    _hasMoreMissions = reloaded.length >= count;
     _stats         = await db.getStats();
     _unsyncedCount = await db.getUnsyncedCount();
     notifyListeners();
@@ -112,9 +130,45 @@ class AppProvider extends ChangeNotifier {
     await refreshAlerts();
   }
 
-  Future<void> updateMission(Mission mission) async {
+  /// Validates the status transition (if status changed) then persists.
+  /// Returns an error message string on rejection, or null on success.
+  Future<String?> updateMission(Mission mission) async {
+    if (mission.id != null) {
+      final current =
+          await DatabaseHelper.instance.getMissionById(mission.id!);
+      if (current != null && current.status != mission.status) {
+        if (!Mission.canTransition(current.status, mission.status)) {
+          return 'Cannot change status from '
+              '"${current.statusLabel}" to "${mission.statusLabel}".';
+        }
+      }
+    }
     await DatabaseHelper.instance.updateMission(mission);
     await refreshMissions();
+    return null;
+  }
+
+  /// Appends the next page of missions (DB LIMIT/OFFSET).
+  /// No-op if [hasMoreMissions] is false.
+  Future<void> loadMoreMissions() async {
+    if (!_hasMoreMissions) return;
+    final db = DatabaseHelper.instance;
+    final profile = await db.getUserProfile();
+    final more = await db.getMissionsForUserPaged(
+      profile?.name ?? '',
+      profile?.role == 'crp',
+      userId: profile?.supabaseId ?? '',
+      limit: _pageSize,
+      offset: _missions.length,
+    );
+    if (more.isEmpty) {
+      _hasMoreMissions = false;
+      notifyListeners();
+      return;
+    }
+    _missions = [..._missions, ...more];
+    _hasMoreMissions = more.length >= _pageSize;
+    notifyListeners();
   }
 
   Future<void> syncData() async {

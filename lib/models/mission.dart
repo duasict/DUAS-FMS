@@ -117,6 +117,20 @@ class Mission {
   static String _normalizeStatus(String s) =>
       s == 'approved' ? 'planning' : s;
 
+  /// Returns true if transitioning [from] → [to] is a valid mission status change.
+  ///
+  ///   planning    → in_progress | cancelled
+  ///   in_progress → completed   | cancelled
+  ///   completed   → (terminal — no transitions allowed)
+  ///   cancelled   → (terminal — no transitions allowed)
+  static bool canTransition(String from, String to) {
+    const allowed = <String, Set<String>>{
+      'planning':    {'in_progress', 'cancelled'},
+      'in_progress': {'completed',   'cancelled'},
+    };
+    return allowed[from]?.contains(to) ?? false;
+  }
+
   Map<String, dynamic> toMap() {
     return {
       if (id != null) 'id': id,

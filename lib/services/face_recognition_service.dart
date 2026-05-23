@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -39,21 +40,50 @@ class FaceRecognitionService {
   /// Absolute path to the model in the temp directory — passed to compute().
   static String? _modelTempPath;
 
-  /// Load and cache the TFLite model from assets. Safe to call multiple times.
+  // Persistent cache path (survives app restarts, unlike tmp)
+  static const _cachedModelName = 'mobilefacenet_cached.tflite';
+
+  /// Load and cache the TFLite model. Resolution order:
+  ///   1. Persistent document-directory cache (fastest on repeat launches)
+  ///   2. Supabase Storage bucket "models" (download on demand, then cache)
+  ///   3. Bundled asset as last resort (requires file to exist in assets/)
+  ///
+  /// Safe to call multiple times — subsequent calls return immediately.
   static Future<void> initialize() async {
     if (_initialized) return;
     _initialized = true;
+
+    final docDir    = await getApplicationDocumentsDirectory();
+    final cacheFile = File('${docDir.path}/$_cachedModelName');
+
+    // ── 1. Use existing on-device cache ──────────────────────────────────
+    if (await cacheFile.exists()) {
+      _modelTempPath  = cacheFile.path;
+      _modelAvailable = true;
+      return;
+    }
+
+    // ── 2. Download from Supabase Storage ────────────────────────────────
     try {
-      // Load model bytes via rootBundle (main isolate only)
+      final bytes = await Supabase.instance.client.storage
+          .from('models')
+          .download('MobileFaceNet.tflite');
+      await cacheFile.writeAsBytes(bytes);
+      _modelTempPath  = cacheFile.path;
+      _modelAvailable = true;
+      return;
+    } catch (_) {
+      // Storage unavailable or model not uploaded yet — fall through
+    }
+
+    // ── 3. Fall back to bundled asset ─────────────────────────────────────
+    try {
       final byteData =
           await rootBundle.load('assets/models/MobileFaceNet.tflite');
       final bytes = byteData.buffer.asUint8List();
-
-      // Write to a temp file so compute() isolates can load it via fromFile()
-      final tmpDir = await getTemporaryDirectory();
-      final tmpFile = File('${tmpDir.path}/mobilefacenet.tflite');
-      await tmpFile.writeAsBytes(bytes);
-      _modelTempPath = tmpFile.path;
+      // Write to cache so future launches skip this path
+      await cacheFile.writeAsBytes(bytes);
+      _modelTempPath  = cacheFile.path;
       _modelAvailable = true;
     } catch (_) {
       _modelAvailable = false;

@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_sqlcipher/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/mission.dart';
 import '../models/aircraft.dart';
@@ -10,6 +10,7 @@ import '../models/flight_log.dart';
 import '../models/flight_plan.dart';
 import '../models/hira_row.dart';
 import '../models/user_profile.dart';
+import '../services/encryption_service.dart';
 import '../services/org_settings_service.dart';
 
 class DatabaseHelper {
@@ -28,13 +29,30 @@ class DatabaseHelper {
 
   Future<Database> _initDb() async {
     final dbPath = await getDatabasesPath();
-    final path = join(dbPath, _dbName);
-    return openDatabase(
-      path,
-      version: _dbVersion,
-      onCreate: _onCreate,
-      onUpgrade: _onUpgrade,
-    );
+    final path   = join(dbPath, _dbName);
+    final key    = await EncryptionService.getDatabaseKey();
+
+    // Try to open with the encryption key.
+    // If the existing file is an unencrypted legacy DB (e.g. from before this
+    // change) SQLCipher will throw — delete it and start fresh.
+    try {
+      return await openDatabase(
+        path,
+        version: _dbVersion,
+        password: key,
+        onCreate: _onCreate,
+        onUpgrade: _onUpgrade,
+      );
+    } catch (_) {
+      await deleteDatabase(path);
+      return openDatabase(
+        path,
+        version: _dbVersion,
+        password: key,
+        onCreate: _onCreate,
+        onUpgrade: _onUpgrade,
+      );
+    }
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -1181,6 +1199,41 @@ class DatabaseHelper {
           OR (c.user_id IS NOT NULL AND c.user_id != '' AND c.user_id = ?)
         ORDER BY m.date ASC
       ''', [userName.trim(), userId]);
+    }
+    final missions = rows.map(Mission.fromMap).toList();
+    for (final m in missions) {
+      m.crew = await getCrewForMission(m.id!);
+    }
+    return missions;
+  }
+
+  /// Paginated variant of [getMissionsForUser].
+  /// Uses LIMIT/OFFSET for scroll-based loading.
+  Future<List<Mission>> getMissionsForUserPaged(
+    String userName,
+    bool isCrp, {
+    String userId = '',
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    final db = await database;
+    final List<Map<String, dynamic>> rows;
+    if (isCrp || userName.trim().isEmpty) {
+      rows = await db.query(
+        'missions',
+        orderBy: 'date ASC',
+        limit: limit,
+        offset: offset,
+      );
+    } else {
+      rows = await db.rawQuery('''
+        SELECT DISTINCT m.* FROM missions m
+        INNER JOIN crew_members c ON c.mission_id = m.id
+        WHERE c.name = ?
+          OR (c.user_id IS NOT NULL AND c.user_id != '' AND c.user_id = ?)
+        ORDER BY m.date ASC
+        LIMIT ? OFFSET ?
+      ''', [userName.trim(), userId, limit, offset]);
     }
     final missions = rows.map(Mission.fromMap).toList();
     for (final m in missions) {
