@@ -114,6 +114,16 @@ class P2pConcurrenceService {
 
   static Future<void> _writeConcurrence(String status) async {
     final db = await DatabaseHelper.instance.database;
+
+    // Persist the decision on the mission record so the banner updates
+    await db.update(
+      'missions',
+      {'crp_concurrence_status': status},
+      where: 'id = ?',
+      whereArgs: [_missionId],
+    );
+
+    // Insert alert so the crew is notified
     await db.insert('alerts', {
       'type': 'concurrence',
       'title': 'CRP Concurrence — ${status.toUpperCase()}',

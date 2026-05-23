@@ -1182,7 +1182,7 @@ class DatabaseHelper {
     final missions = await db.rawQuery('SELECT COUNT(*) as c FROM missions');
     final aircraft = await db.rawQuery('SELECT COUNT(*) as c FROM aircraft');
     final concurrences = await db.rawQuery(
-        "SELECT COUNT(*) as c FROM alerts WHERE type = 'concurrence' AND status = 'pending'");
+        "SELECT COUNT(*) as c FROM missions WHERE crp_concurrence_required = 1 AND (crp_concurrence_status = '' OR crp_concurrence_status IS NULL)");
     final durationResult = await db.rawQuery(
         "SELECT SUM(duration) as total FROM missions WHERE status = 'completed'");
     final totalMin =

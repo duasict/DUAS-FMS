@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../../database/database_helper.dart';
 import '../../models/flight_plan.dart';
 import '../../models/hira_row.dart';
@@ -28,12 +30,19 @@ class _MissionApprovalScreenState extends State<MissionApprovalScreen> {
   bool _isOnline = true;
   bool _p2pRunning = false;
   String _p2pIp = '';
+  Timer? _p2pPollTimer;
 
   @override
   void initState() {
     super.initState();
     _load();
     _checkConnectivity();
+  }
+
+  @override
+  void dispose() {
+    _stopPollTimer();
+    super.dispose();
   }
 
   Future<void> _checkConnectivity() async {
@@ -55,11 +64,32 @@ class _MissionApprovalScreenState extends State<MissionApprovalScreen> {
         _p2pIp = ip ?? '';
       });
     }
+    // Poll every 3 s so the banner updates when CRP approves/rejects remotely
+    _p2pPollTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
+      final updated =
+          await DatabaseHelper.instance.getMissionById(widget.missionId);
+      if (!mounted) return;
+      final statusChanged =
+          updated?.crpConcurrenceStatus != _mission?.crpConcurrenceStatus;
+      if (statusChanged) {
+        setState(() => _mission = updated);
+        // Stop polling once a decision is recorded
+        if (updated?.crpConcurrenceStatus.isNotEmpty == true) {
+          _stopPollTimer();
+        }
+      }
+    });
   }
 
   Future<void> _stopP2p() async {
+    _stopPollTimer();
     await P2pConcurrenceService.stopServer();
     if (mounted) setState(() => _p2pRunning = false);
+  }
+
+  void _stopPollTimer() {
+    _p2pPollTimer?.cancel();
+    _p2pPollTimer = null;
   }
 
   Future<void> _load() async {
@@ -199,6 +229,32 @@ class _MissionApprovalScreenState extends State<MissionApprovalScreen> {
             ),
           )
         else ...[
+          // QR code — CRP scans this with their phone browser
+          Center(
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: QrImageView(
+                data: 'http://$_p2pIp:7788/concurrence',
+                version: QrVersions.auto,
+                size: 180,
+                backgroundColor: Colors.white,
+                eyeStyle: const QrEyeStyle(
+                  eyeShape: QrEyeShape.square,
+                  color: Colors.black,
+                ),
+                dataModuleStyle: const QrDataModuleStyle(
+                  dataModuleShape: QrDataModuleShape.square,
+                  color: Colors.black,
+                ),
+              ),
+            ),
+          ),
+          // URL as fallback text
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
@@ -215,7 +271,7 @@ class _MissionApprovalScreenState extends State<MissionApprovalScreen> {
                   'http://$_p2pIp:7788/concurrence',
                   style: const TextStyle(
                       color: AppColors.success,
-                      fontSize: 12,
+                      fontSize: 11,
                       fontFamily: 'monospace'),
                 ),
               ),

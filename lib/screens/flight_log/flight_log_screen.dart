@@ -434,22 +434,22 @@ class _FlightLogScreenState extends State<FlightLogScreen> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppColors.warning.withValues(alpha: 0.06),
+                    color: AppColors.success.withValues(alpha: 0.06),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                        color: AppColors.warning.withValues(alpha: 0.3)),
+                        color: AppColors.success.withValues(alpha: 0.3)),
                   ),
                   child: const Row(
                     children: [
-                      Icon(Icons.info_outline,
-                          color: AppColors.warning, size: 16),
+                      Icon(Icons.check_circle_outline,
+                          color: AppColors.success, size: 16),
                       SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Report generation will be available in a future update. '
-                          'Submitting will mark this mission as Completed.',
+                          'Submitting marks this mission as Completed. '
+                          'All Annex A PDF reports will then be available from the Mission Details screen.',
                           style: TextStyle(
-                              color: AppColors.warning, fontSize: 11),
+                              color: AppColors.success, fontSize: 11),
                         ),
                       ),
                     ],
