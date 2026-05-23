@@ -124,7 +124,7 @@ class _DataStorageScreenState extends State<DataStorageScreen> {
                 _infoTile(context,
                     icon: Icons.storage_outlined,
                     label: 'Engine',
-                    value: 'SQLite v6 (sqflite)'),
+                    value: 'SQLite v7 (sqflite)'),
                 _infoTile(context,
                     icon: Icons.cloud_off_outlined,
                     label: 'Offline Support',

@@ -22,6 +22,8 @@ class _MissionCreateScreenState extends State<MissionCreateScreen> {
   final _objectiveCtrl = TextEditingController();
   final _crpNotesCtrl = TextEditingController();
 
+  bool _crpConcurrenceRequired = false;
+
   // Fixed crew slots
   // RPIC must be a verified PIC — chosen from a picker, not free text
   UserProfile? _selectedRpic;
@@ -191,6 +193,7 @@ class _MissionCreateScreenState extends State<MissionCreateScreen> {
       aircraftName: _selectedAircraftName,
       aircraftType: _selectedAircraftType,
       crpAdvisoryNotes: _crpNotesCtrl.text.trim(),
+      crpConcurrenceRequired: _crpConcurrenceRequired,
       createdAt: DateTime.now().toIso8601String(),
     );
 
@@ -345,6 +348,57 @@ class _MissionCreateScreenState extends State<MissionCreateScreen> {
                     hint:
                         'Operational guidance, cautions, or clearances from CRP...',
                     maxLines: 3),
+                const SizedBox(height: 12),
+                // CRP concurrence toggle — only meaningful for HIGH-RISK missions
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: _crpConcurrenceRequired
+                        ? AppColors.warning.withValues(alpha: 0.07)
+                        : context.colors.surface,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: _crpConcurrenceRequired
+                          ? AppColors.warning.withValues(alpha: 0.4)
+                          : context.colors.border,
+                    ),
+                  ),
+                  child: Row(children: [
+                    Icon(
+                      Icons.gavel_outlined,
+                      size: 18,
+                      color: _crpConcurrenceRequired
+                          ? AppColors.warning
+                          : context.colors.textMuted,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                        Text('Require CRP Concurrence',
+                            style: TextStyle(
+                                color: _crpConcurrenceRequired
+                                    ? AppColors.warning
+                                    : context.colors.textPrimary,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600)),
+                        Text(
+                          'HIRA residual risk ≥ 9 — CRP must approve before operations.',
+                          style: TextStyle(
+                              color: context.colors.textMuted, fontSize: 11),
+                        ),
+                      ]),
+                    ),
+                    Switch(
+                      value: _crpConcurrenceRequired,
+                      onChanged: (v) =>
+                          setState(() => _crpConcurrenceRequired = v),
+                      activeThumbColor: AppColors.warning,
+                      activeTrackColor: AppColors.warning.withValues(alpha: 0.3),
+                    ),
+                  ]),
+                ),
               ],
             ),
       bottomNavigationBar: SafeArea(

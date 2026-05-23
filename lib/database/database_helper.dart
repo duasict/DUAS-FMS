@@ -898,6 +898,12 @@ class DatabaseHelper {
         where: 'id = ?', whereArgs: [id]);
   }
 
+  Future<void> updateAlertStatus(int id, String status) async {
+    final db = await database;
+    await db.update('alerts', {'status': status, 'is_read': 1},
+        where: 'id = ?', whereArgs: [id]);
+  }
+
   Future<int> insertAlert(AlertModel a) async {
     final db = await database;
     return db.insert('alerts', a.toMap());

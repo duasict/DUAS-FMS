@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../database/database_helper.dart';
 import '../../providers/app_provider.dart';
 import '../../models/alert_model.dart';
 import '../../theme/app_theme.dart';
@@ -217,12 +218,57 @@ class _AlertTile extends StatelessWidget {
   }
 }
 
-class _AlertDetailSheet extends StatelessWidget {
+class _AlertDetailSheet extends StatefulWidget {
   final AlertModel alert;
   const _AlertDetailSheet({required this.alert});
 
   @override
+  State<_AlertDetailSheet> createState() => _AlertDetailSheetState();
+}
+
+class _AlertDetailSheetState extends State<_AlertDetailSheet> {
+  bool _isSaving = false;
+
+  Future<void> _decide(String decision) async {
+    final mId = widget.alert.missionId;
+    setState(() => _isSaving = true);
+
+    // Write status to the mission record (if linked)
+    if (mId != null) {
+      final mission = await DatabaseHelper.instance.getMissionById(mId);
+      if (mission != null) {
+        mission.crpConcurrenceStatus = decision;
+        await DatabaseHelper.instance.updateMission(mission);
+      }
+    }
+
+    // Update alert row so it no longer shows as pending
+    if (widget.alert.id != null) {
+      await DatabaseHelper.instance.updateAlertStatus(widget.alert.id!, decision);
+    }
+
+    if (!mounted) return;
+
+    // Capture context-dependent objects before the final async gap
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final provider  = context.read<AppProvider>();
+
+    // Refresh all providers so dashboard stat and banner update immediately
+    await provider.refresh();
+
+    navigator.pop();
+    messenger.showSnackBar(SnackBar(
+      content: Text(
+          decision == 'approved' ? 'Mission approved.' : 'Mission rejected.'),
+      backgroundColor:
+          decision == 'approved' ? AppColors.success : AppColors.danger,
+    ));
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final alert = widget.alert;
     final isConcurrence = alert.isConcurrence;
     final accentColor =
         isConcurrence ? AppColors.warning : AppColors.primaryLight;
@@ -233,7 +279,7 @@ class _AlertDetailSheet extends StatelessWidget {
       maxChildSize: 0.9,
       builder: (_, controller) => ListView(
         controller: controller,
-        padding: EdgeInsets.all(24),
+        padding: const EdgeInsets.all(24),
         children: [
           Center(
             child: Container(
@@ -249,7 +295,7 @@ class _AlertDetailSheet extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding: EdgeInsets.all(10),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: accentColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(10),
@@ -262,7 +308,7 @@ class _AlertDetailSheet extends StatelessWidget {
                   size: 22,
                 ),
               ),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   alert.title,
@@ -275,9 +321,9 @@ class _AlertDetailSheet extends StatelessWidget {
               ),
             ],
           ),
-          SizedBox(height: 20),
-          Divider(),
-          SizedBox(height: 16),
+          const SizedBox(height: 20),
+          const Divider(),
+          const SizedBox(height: 16),
           Text(
             alert.message,
             style: TextStyle(
@@ -289,7 +335,8 @@ class _AlertDetailSheet extends StatelessWidget {
           if (alert.missionTitle != null) ...[
             const SizedBox(height: 20),
             _DetailRow(
-                icon: Icons.flight, label: 'Related Mission',
+                icon: Icons.flight,
+                label: 'Related Mission',
                 value: alert.missionTitle!),
           ],
           const SizedBox(height: 12),
@@ -304,23 +351,37 @@ class _AlertDetailSheet extends StatelessWidget {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close, size: 18),
-                    label: const Text('Decline'),
+                    onPressed: _isSaving ? null : () => _decide('rejected'),
+                    icon: _isSaving
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: AppColors.danger))
+                        : const Icon(Icons.close, size: 18),
+                    label: const Text('Reject'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.danger,
                       side: const BorderSide(color: AppColors.danger),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.check, size: 18),
+                    onPressed: _isSaving ? null : () => _decide('approved'),
+                    icon: _isSaving
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white))
+                        : const Icon(Icons.check, size: 18),
                     label: const Text('Approve'),
                     style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.success),
+                        backgroundColor: AppColors.success,
+                        padding: const EdgeInsets.symmetric(vertical: 12)),
                   ),
                 ),
               ],
