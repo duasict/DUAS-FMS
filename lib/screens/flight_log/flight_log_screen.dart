@@ -227,7 +227,13 @@ class _FlightLogScreenState extends State<FlightLogScreen> {
       mission.hasFlightlogComplete = true;
       mission.status = 'completed';
       if (totalMin > 0) mission.duration = totalMin;
-      await provider.updateMission(mission);
+      // Write directly to the DB so the transition guard in
+      // AppProvider.updateMission() (which only allows in_progress → completed)
+      // does not block missions that reach this screen while still in 'planning'.
+      // Submitting the flight log is the definitive completion action regardless
+      // of intermediate checklist state.
+      await DatabaseHelper.instance.updateMission(mission);
+      await provider.refreshMissions();
     }
 
     if (!mounted) return;
