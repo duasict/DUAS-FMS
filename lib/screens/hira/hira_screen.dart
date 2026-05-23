@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../database/database_helper.dart';
 import '../../models/hira_row.dart';
 import '../../providers/app_provider.dart';
+import '../../services/notification_service.dart';
 import '../../theme/app_theme.dart';
 import '../checklists/checklist_widgets.dart';
 import '../equipment_checklist/equipment_checklist_screen.dart';
@@ -140,6 +141,10 @@ class _HiraScreenState extends State<HiraScreen> {
       mission.hasHiraComplete = true;
       mission.crpConcurrenceRequired = _hasHighRisk;
       await provider.updateMission(mission);
+      if (_hasHighRisk) {
+        await NotificationService.showConcurrenceRequest(
+            widget.missionTitle, mission.title);
+      }
     }
 
     if (!mounted) return;

@@ -5,6 +5,7 @@ import 'providers/app_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/user_profile_provider.dart';
 import 'screens/splash_screen.dart';
+import 'services/notification_service.dart';
 import 'services/supabase_service.dart';
 import 'theme/app_theme.dart';
 
@@ -13,6 +14,9 @@ void main() async {
 
   // Initialize Supabase before anything else
   await SupabaseService.initialize();
+
+  // Initialize local notifications
+  await NotificationService.initialize();
 
   // Initialize local SQLite DB
   await DatabaseHelper.instance.database;

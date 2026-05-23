@@ -3,6 +3,7 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as io;
 import 'package:shelf_router/shelf_router.dart';
 import '../database/database_helper.dart';
+import 'notification_service.dart';
 
 class P2pConcurrenceService {
   static HttpServer? _server;
@@ -124,6 +125,7 @@ class P2pConcurrenceService {
       'created_at': DateTime.now().toIso8601String(),
       'is_synced': 0,
     });
+    await NotificationService.showConcurrenceResult(_missionRef, status);
   }
 
   static String _html(String title, String body) => '''

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../database/database_helper.dart';
 import '../models/user_profile.dart';
+import '../services/notification_service.dart';
 
 class UserProfileProvider extends ChangeNotifier {
   UserProfile _profile = const UserProfile(
@@ -23,6 +24,14 @@ class UserProfileProvider extends ChangeNotifier {
         _profile = demoted;
       } else {
         _profile = saved;
+      }
+      // Notify if license is expiring soon
+      if (_profile.licenseVerified &&
+          _profile.isLicenseExpiringSoon &&
+          !_profile.isLicenseExpired) {
+        final expiry = DateTime.parse(_profile.licenseExpiryDate!);
+        final daysLeft = expiry.difference(DateTime.now()).inDays;
+        await NotificationService.showLicenseExpiry(_profile.displayName, daysLeft);
       }
       notifyListeners();
     }
