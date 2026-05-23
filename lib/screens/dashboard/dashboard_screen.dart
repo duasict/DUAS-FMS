@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/app_provider.dart';
+import '../../providers/org_settings_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/stat_card.dart';
 import '../../widgets/mission_card.dart';
@@ -12,6 +13,7 @@ class DashboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<AppProvider>();
+    final orgTagline = context.watch<OrgSettingsProvider>().tagline;
 
     return Scaffold(
       appBar: AppBar(
@@ -21,7 +23,7 @@ class DashboardScreen extends StatelessWidget {
             Text('Dashboard',
                 style:
                     TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-            Text('UAS Fleet Management',
+            Text(orgTagline,
                 style: TextStyle(
                     fontSize: 11,
                     color: context.colors.textSecondary,

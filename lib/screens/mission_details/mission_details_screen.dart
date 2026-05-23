@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../models/mission.dart';
 import '../../models/crew_member.dart';
 import '../../database/database_helper.dart';
+import '../../providers/app_provider.dart';
+import '../../providers/user_profile_provider.dart';
 import '../../theme/app_theme.dart';
 import '../checklists/inflight_checklist_screen.dart';
 import '../checklists/postflight_checklist_screen.dart';
@@ -80,11 +83,49 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
 
   Color _statusColor(String s) {
     switch (s) {
-      case 'completed': return AppColors.success;
-      case 'planning': return AppColors.primary;
-      case 'in_progress': return AppColors.accent;
-      default: return context.colors.textMuted;
+      case 'completed':  return AppColors.success;
+      case 'planning':   return AppColors.primary;
+      case 'in_progress':return AppColors.accent;
+      case 'cancelled':  return AppColors.danger;
+      default:           return context.colors.textMuted;
     }
+  }
+
+  Future<void> _cancelMission() async {
+    final m = _mission;
+    if (m == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: ctx.colors.card,
+        title: Text('Cancel Mission',
+            style: TextStyle(color: ctx.colors.textPrimary)),
+        content: Text(
+          'Cancel "${m.title}"?\n\n'
+          'The mission will be marked as Cancelled and removed from '
+          'the active list. This cannot be undone.',
+          style: TextStyle(color: ctx.colors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Keep Mission',
+                style: TextStyle(color: ctx.colors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
+            child: const Text('Cancel Mission'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    m.status = 'cancelled';
+    await context.read<AppProvider>().updateMission(m);
+    await _load();
   }
 
   @override
@@ -99,13 +140,16 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
 
     final m = _mission!;
 
+    final isCrp = context.watch<UserProfileProvider>().profile.role == 'crp';
+    final canCancel = isCrp && !m.isCompleted && !m.isCancelled;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(m.missionId,
             style: const TextStyle(fontFamily: 'monospace', fontSize: 16)),
         actions: [
           Container(
-            margin: const EdgeInsets.only(right: 14),
+            margin: EdgeInsets.only(right: canCancel ? 4 : 14),
             padding:
                 const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
@@ -124,6 +168,25 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
               ),
             ),
           ),
+          if (canCancel)
+            PopupMenuButton<String>(
+              icon: Icon(Icons.more_vert, color: context.colors.textSecondary),
+              color: context.colors.card,
+              onSelected: (v) { if (v == 'cancel') _cancelMission(); },
+              itemBuilder: (_) => [
+                PopupMenuItem(
+                  value: 'cancel',
+                  child: Row(children: [
+                    const Icon(Icons.cancel_outlined,
+                        color: AppColors.danger, size: 18),
+                    const SizedBox(width: 10),
+                    Text('Cancel Mission',
+                        style: TextStyle(
+                            color: AppColors.danger, fontSize: 14)),
+                  ]),
+                ),
+              ],
+            ),
         ],
       ),
       body: ListView(
@@ -685,6 +748,35 @@ class _BottomAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (mission.isCancelled) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            decoration: BoxDecoration(
+              color: AppColors.danger.withValues(alpha: 0.07),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
+            ),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.cancel_outlined, color: AppColors.danger, size: 18),
+                SizedBox(width: 8),
+                Text('Mission Cancelled',
+                    style: TextStyle(
+                        color: AppColors.danger,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     if (mission.isCompleted) {
       return SafeArea(
         child: Padding(

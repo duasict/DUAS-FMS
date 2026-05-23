@@ -609,25 +609,30 @@ class _MissionApprovalScreenState extends State<MissionApprovalScreen> {
 
   String _roleLabel(String role) {
     switch (role.toLowerCase()) {
-      case 'rpic':  return 'RPIC — Remote Pilot in Command';
-      case 'vo':    return 'VO — Visual Observer';
-      case 'gcs':   return 'GCS Operator';
-      case 'tech':  return 'Technical Crew Member';
-      default:      return role.toUpperCase();
+      case 'rpic': return 'RPIC — Remote Pilot in Command';
+      case 'vo':   return 'VO — Visual Observer';
+      case 'gcs':  return 'GCS Operator';
+      case 'tech': return 'Technical Crew Member';
+      case 'pic':  return 'PIC — Pilot in Command';
+      case 'crp':  return 'CRP — Certified Remote Pilot / Safety Officer';
+      default:     return role.toUpperCase();
     }
   }
 
   String _roleBrief(String role) {
-    switch (role.toUpperCase()) {
-      case 'RPIC':
-        return 'Responsible for pre-flight authorization, mission execution, and all emergency decisions. Maintains situational awareness throughout.';
-      case 'VO':
-      case 'VO/GCS':
+    switch (role.toLowerCase()) {
+      case 'rpic':
+        return 'Responsible for pre-flight authorisation, mission execution, and all emergency decisions. Maintains situational awareness throughout.';
+      case 'vo':
         return 'Maintain continuous visual line-of-sight with the aircraft. Monitor airspace for conflicts. Report anomalies to RPIC immediately.';
-      case 'GCS':
-        return 'Operate ground control station. Monitor telemetry, battery, and data links. Coordinate with RPIC on all GCS observations.';
-      case 'TECH':
-        return 'Technical Crew Member — responsible for equipment preparation, airframe maintenance checks, and data offload after the mission.';
+      case 'gcs':
+        return 'Operate the ground control station. Monitor telemetry, battery, and data links. Coordinate with RPIC on all GCS observations.';
+      case 'tech':
+        return 'Responsible for equipment preparation, airframe maintenance checks, and data offload after the mission.';
+      case 'pic':
+        return 'Qualified Pilot in Command assigned to support this operation. Assist RPIC with flight decisions and emergency procedures.';
+      case 'crp':
+        return 'Certified Remote Pilot / Safety Officer. Oversees compliance, reviews HIRA, and grants concurrence for high-risk operations.';
       default:
         return 'Follow RPIC instructions. Maintain communication discipline. Report any safety concerns immediately.';
     }
