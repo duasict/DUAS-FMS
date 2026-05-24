@@ -845,10 +845,24 @@ class _LicenseVerificationScreenState
             ),
           ),
           child: bytes != null
-              ? ClipRRect(
-                  borderRadius: BorderRadius.circular(11),
-                  child: Image.memory(bytes,
-                      fit: BoxFit.cover, width: double.infinity))
+              ? Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(11),
+                      child: Image.memory(bytes,
+                          fit: BoxFit.cover, width: double.infinity),
+                    ),
+                    // Score badge overlay (Change 10) — shown once comparison runs
+                    if (_faceSimilarityScore != null)
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        child: _scoreBadgeOverlay(_faceSimilarityScore!),
+                      ),
+                  ],
+                )
               : _isDetectingFace
                   ? const Center(
                       child: CircularProgressIndicator(
@@ -868,6 +882,48 @@ class _LicenseVerificationScreenState
         ),
       ),
     ]);
+  }
+
+  /// Small overlay badge at the bottom of the selfie thumbnail showing the
+  /// similarity score colour-coded by threshold (Change 10).
+  Widget _scoreBadgeOverlay(double score) {
+    final pct = (score * 100).round();
+    final Color badgeColor;
+    final IconData badgeIcon;
+    if (score >= 0.65) {
+      badgeColor = AppColors.success;
+      badgeIcon = Icons.check_circle;
+    } else if (score >= 0.40) {
+      badgeColor = AppColors.warning;
+      badgeIcon = Icons.help;
+    } else {
+      badgeColor = AppColors.danger;
+      badgeIcon = Icons.cancel;
+    }
+    return ClipRRect(
+      borderRadius: const BorderRadius.only(
+        bottomLeft: Radius.circular(11),
+        bottomRight: Radius.circular(11),
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+        color: badgeColor.withValues(alpha: 0.88),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(badgeIcon, color: Colors.white, size: 12),
+            const SizedBox(width: 4),
+            Text(
+              '$pct% match',
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   /// Score-based result card shown after automated TFLite comparison (Change 10).

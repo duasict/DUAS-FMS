@@ -1,14 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import '../../providers/org_settings_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/user_profile_provider.dart';
 import '../../theme/app_theme.dart';
-import '../../utils/app_constants.dart';
 import '../onboarding/org_setup_screen.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  String _appVersion = '…';
+
+  @override
+  void initState() {
+    super.initState();
+    PackageInfo.fromPlatform().then((info) {
+      if (mounted) setState(() => _appVersion = info.version);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +60,7 @@ class SettingsScreen extends StatelessWidget {
             context,
             icon: Icons.info_outline,
             title: 'App Version',
-            value: 'FMS v${AppConstants.appVersion}',
+            value: 'FMS v$_appVersion',
           ),
           _infoTile(
             context,

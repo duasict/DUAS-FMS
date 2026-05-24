@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../database/database_helper.dart';
+import '../models/user_profile.dart';
 import '../providers/org_settings_provider.dart';
-import '../theme/app_theme.dart';
-import '../utils/app_constants.dart';
+import '../providers/user_profile_provider.dart';
 import '../services/supabase_service.dart';
+import '../theme/app_theme.dart';
 import 'main_navigation.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -20,6 +23,14 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
   bool _isLoading = false;
   String? _errorMessage;
+  String _appVersion = '';
+
+  @override
+  void initState() {
+    super.initState();
+    PackageInfo.fromPlatform()
+        .then((i) { if (mounted) setState(() => _appVersion = i.version); });
+  }
 
   @override
   void dispose() {
@@ -44,6 +55,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       await SupabaseService.signIn(email, password);
+
+      // Sync remote profile into local DB before navigating so the rest of the
+      // app immediately sees the correct name/role/org from Supabase.
+      if (mounted) {
+        await _syncProfileFromSupabase();
+      }
+
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
@@ -56,6 +74,64 @@ class _LoginScreenState extends State<LoginScreen> {
           _errorMessage = 'Unable to connect. Check your internet connection.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  /// Pull the signed-in user's profile from Supabase and write it to the
+  /// local SQLite DB.  Non-fatal — if Supabase is unreachable we proceed with
+  /// whatever is stored locally.
+  Future<void> _syncProfileFromSupabase() async {
+    final userId = SupabaseService.currentUser?.id ?? '';
+    if (userId.isEmpty) return;
+
+    try {
+      final remote = await SupabaseService.fetchProfile(userId);
+      if (remote == null) return;
+
+      // Use existing local record as the base so device-only fields
+      // (photoPath, license scan data) are preserved.
+      final existing = await DatabaseHelper.instance.getUserProfile();
+
+      // Supabase stores license_verified / face_verified as PostgreSQL
+      // booleans; the Dart client returns them as bool.
+      bool remoteBool(String key, bool? fallback) {
+        final v = remote[key];
+        if (v is bool) return v;
+        if (v is int) return v == 1;
+        return fallback ?? false;
+      }
+
+      final updated = UserProfile(
+        id: existing?.id,
+        supabaseId: userId,
+        name: (remote['name'] as String?)?.isNotEmpty == true
+            ? remote['name'] as String
+            : existing?.name ?? '',
+        role: remote['role'] as String? ?? existing?.role ?? 'vo',
+        email: remote['email'] as String? ?? existing?.email ?? '',
+        unit: remote['unit'] as String? ?? existing?.unit ?? '',
+        phone: remote['phone'] as String? ?? existing?.phone ?? '',
+        organizationId:
+            remote['organization_id'] as String? ?? existing?.organizationId ?? '',
+        licenseNumber:
+            remote['license_number'] as String? ?? existing?.licenseNumber ?? '',
+        licenseExpiryDate: (remote['license_expiry_date'] as String?)?.isEmpty == true
+            ? existing?.licenseExpiryDate
+            : remote['license_expiry_date'] as String? ?? existing?.licenseExpiryDate,
+        licenseVerified:
+            remoteBool('license_verified', existing?.licenseVerified),
+        faceVerified: remoteBool('face_verified', existing?.faceVerified),
+        // photoPath is device-only — never overwrite from server
+        photoPath: existing?.photoPath,
+      );
+
+      await DatabaseHelper.instance.saveUserProfile(updated);
+
+      if (mounted) {
+        await context.read<UserProfileProvider>().load();
+      }
+    } catch (_) {
+      // Non-fatal — proceed with local profile
     }
   }
 
@@ -284,7 +360,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     border: Border.all(color: context.colors.border),
                   ),
                   child: Text(
-                    '🔒  ${org.orgName}  ·  v${AppConstants.appVersion}',
+                    '🔒  ${org.orgName}${_appVersion.isNotEmpty ? '  ·  v$_appVersion' : ''}',
                     style: TextStyle(
                         color: context.colors.textMuted, fontSize: 11),
                   ),
