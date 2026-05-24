@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as io;
 import 'package:shelf_router/shelf_router.dart';
@@ -12,6 +13,18 @@ class P2pConcurrenceService {
   static String _missionRef = '';
   static String _missionTitle = '';
 
+  // ── Auth token ───────────────────────────────────────────────────────────
+  // A one-time token embedded in the QR-code URL and validated on every
+  // state-changing POST.  Generated fresh each time the server starts so that
+  // a stale QR code from a previous session cannot be replayed.
+  static String _authToken = '';
+
+  static String _generateToken() {
+    final rng = Random.secure();
+    final bytes = List<int>.generate(16, (_) => rng.nextInt(256));
+    return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+  }
+
   /// Start the local HTTP server for a given mission.
   /// Returns the device IP address so it can be shown as a URL, or null on failure.
   static Future<String?> startServer({
@@ -19,9 +32,10 @@ class P2pConcurrenceService {
     required String missionRef,
     required String missionTitle,
   }) async {
-    _missionId = missionId;
-    _missionRef = missionRef;
+    _missionId    = missionId;
+    _missionRef   = missionRef;
     _missionTitle = missionTitle;
+    _authToken    = _generateToken();
 
     final router = Router()
       ..get('/', _handleRoot)
@@ -53,6 +67,7 @@ class P2pConcurrenceService {
   static Future<void> stopServer() async {
     await _server?.close(force: true);
     _server = null;
+    _authToken = ''; // invalidate token when server stops
   }
 
   static bool get isRunning => _server != null;
@@ -117,6 +132,9 @@ class P2pConcurrenceService {
             '<tr><td>${r.hazard}</td><td>${r.likelihood}</td><td>${r.impact}</td>'
             '<td>${r.likelihood * r.impact}</td><td>${r.mitigation}</td></tr>')
         .join();
+    // Token embedded as a hidden field — validated server-side on every POST
+    // so that any device that didn't scan the QR code cannot approve/reject.
+    final tok = _authToken;
     final body = '''
       <h2>$_missionRef — ${mission.title}</h2>
       <p><b>Location:</b> ${mission.location} | <b>Date:</b> ${mission.date} ${mission.timeStr}</p>
@@ -127,10 +145,12 @@ class P2pConcurrenceService {
       </table>
       <br/>
       <form method="post" action="/concurrence/approve" style="display:inline">
+        <input type="hidden" name="_tok" value="$tok">
         <button style="background:#4CAF50;color:white;padding:12px 32px;font-size:16px">&#x2714; APPROVE</button>
       </form>
       &nbsp;&nbsp;
       <form method="post" action="/concurrence/reject" style="display:inline">
+        <input type="hidden" name="_tok" value="$tok">
         <button style="background:#f44336;color:white;padding:12px 32px;font-size:16px">&#x2716; REJECT</button>
       </form>
     ''';
@@ -139,6 +159,13 @@ class P2pConcurrenceService {
   }
 
   static Future<Response> _handleApprove(Request req) async {
+    if (!_validateToken(await req.readAsString())) {
+      return Response.forbidden(
+        _html('Forbidden', '<p style="color:red">Invalid or expired session '
+            'token. Please reload the QR-code page and try again.</p>'),
+        headers: {'content-type': 'text/html'},
+      );
+    }
     await _writeConcurrence('approved');
     return Response.ok(
       _html('Approved',
@@ -148,12 +175,26 @@ class P2pConcurrenceService {
   }
 
   static Future<Response> _handleReject(Request req) async {
+    if (!_validateToken(await req.readAsString())) {
+      return Response.forbidden(
+        _html('Forbidden', '<p style="color:red">Invalid or expired session '
+            'token. Please reload the QR-code page and try again.</p>'),
+        headers: {'content-type': 'text/html'},
+      );
+    }
     await _writeConcurrence('rejected');
     return Response.ok(
       _html('Rejected',
           '<h2 style="color:red">&#x2716; Mission REJECTED</h2><p>You may close this page.</p>'),
       headers: {'content-type': 'text/html'},
     );
+  }
+
+  /// Returns true only if the POST body contains the correct session token.
+  static bool _validateToken(String body) {
+    if (_authToken.isEmpty) return false;
+    final params = Uri.splitQueryString(body);
+    return params['_tok'] == _authToken;
   }
 
   static Future<void> _writeConcurrence(String status) async {

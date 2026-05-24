@@ -160,6 +160,39 @@ class SupabaseService {
     }
   }
 
+  // ── Remote CRP Concurrence (Change 5) ─────────────────────────────────────
+
+  /// Returns missions in [orgId] that need CRP concurrence but have not yet
+  /// received a decision.  Called on every CRP alert-refresh when online.
+  static Future<List<Map<String, dynamic>>> fetchPendingConcurrences(
+      String orgId) async {
+    try {
+      final rows = await client
+          .from('missions')
+          .select('mission_ref, title')
+          .eq('organization_id', orgId)
+          .eq('crp_concurrence_required', true)
+          .eq('crp_concurrence_status', '')
+          .order('created_at', ascending: false);
+      return List<Map<String, dynamic>>.from(rows as List);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Writes the CRP's decision directly to the Supabase missions row so the
+  /// RPIC's 60-second poll picks it up without waiting for a full sync cycle.
+  static Future<void> updateConcurrenceDecision({
+    required String missionRef,
+    required String orgId,
+    required String status,
+  }) =>
+      client
+          .from('missions')
+          .update({'crp_concurrence_status': status})
+          .eq('mission_ref', missionRef)
+          .eq('organization_id', orgId);
+
   // ── Standalone Logs ───────────────────────────────────────────────────────
 
   static Future<void> upsertMaintenanceLogs(List<Map<String, dynamic>> rows) =>

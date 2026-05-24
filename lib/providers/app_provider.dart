@@ -5,6 +5,8 @@ import '../models/mission.dart';
 import '../models/aircraft.dart';
 import '../models/alert_model.dart';
 import '../database/database_helper.dart';
+import '../services/notification_service.dart';
+import '../services/supabase_service.dart';
 import '../services/sync_service.dart';
 
 class AppProvider extends ChangeNotifier {
@@ -124,8 +126,37 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> refreshAlerts() async {
-    _alerts = await DatabaseHelper.instance.getAlerts();
-    _unsyncedCount = await DatabaseHelper.instance.getUnsyncedCount();
+    final db = DatabaseHelper.instance;
+
+    // CRP users: pull any newly-posted concurrence requests from Supabase and
+    // create local alert records so they appear without a full sync cycle.
+    if (_isOnline && SupabaseService.isSignedIn) {
+      final profile = await db.getUserProfile();
+      if (profile?.role == 'crp' && profile!.organizationId.isNotEmpty) {
+        try {
+          final pending = await SupabaseService.fetchPendingConcurrences(
+              profile.organizationId);
+          for (final row in pending) {
+            final ref   = row['mission_ref'] as String? ?? '';
+            final title = row['title']       as String? ?? '';
+            if (ref.isEmpty) continue;
+            final newId = await db.upsertConcurrenceAlert(
+              missionRef:   ref,
+              missionTitle: title,
+            );
+            // Fire a local notification only for alerts that were just inserted
+            if (newId != -1) {
+              await NotificationService.showConcurrenceRequest(ref, title);
+            }
+          }
+        } catch (_) {
+          // Non-fatal — fall through to local alerts
+        }
+      }
+    }
+
+    _alerts        = await db.getAlerts();
+    _unsyncedCount = await db.getUnsyncedCount();
     notifyListeners();
   }
 

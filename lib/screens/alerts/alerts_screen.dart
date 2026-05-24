@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../database/database_helper.dart';
-import '../../providers/app_provider.dart';
 import '../../models/alert_model.dart';
+import '../../providers/app_provider.dart';
+import '../../services/supabase_service.dart';
 import '../../theme/app_theme.dart';
 
 class AlertsScreen extends StatelessWidget {
@@ -230,10 +231,11 @@ class _AlertDetailSheetState extends State<_AlertDetailSheet> {
   bool _isSaving = false;
 
   Future<void> _decide(String decision) async {
-    final mId = widget.alert.missionId;
+    final mId  = widget.alert.missionId;
+    final mRef = widget.alert.missionRef;
     setState(() => _isSaving = true);
     try {
-      // Write concurrence status to the mission record (if linked)
+      // 1 — Update local mission record if present on this device
       if (mId != null) {
         final mission = await DatabaseHelper.instance.getMissionById(mId);
         if (mission != null) {
@@ -242,10 +244,28 @@ class _AlertDetailSheetState extends State<_AlertDetailSheet> {
         }
       }
 
-      // Update alert row so it no longer shows as pending
+      // 2 — Mark alert as decided locally
       if (widget.alert.id != null) {
         await DatabaseHelper.instance
             .updateAlertStatus(widget.alert.id!, decision);
+      }
+
+      // 3 — Write decision directly to Supabase so the RPIC's 60-second poll
+      //     picks it up immediately, without waiting for the next sync cycle.
+      if (mRef != null && mRef.isNotEmpty && SupabaseService.isSignedIn) {
+        final profile = await DatabaseHelper.instance.getUserProfile();
+        final orgId   = profile?.organizationId ?? '';
+        if (orgId.isNotEmpty) {
+          try {
+            await SupabaseService.updateConcurrenceDecision(
+              missionRef: mRef,
+              orgId:      orgId,
+              status:     decision,
+            );
+          } catch (_) {
+            // Non-fatal — local change will sync on the next background cycle
+          }
+        }
       }
 
       if (!mounted) return;

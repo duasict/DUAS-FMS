@@ -379,10 +379,14 @@ class _CrewManagementScreenState extends State<CrewManagementScreen> {
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-      itemCount: _members.length,
-      itemBuilder: (_, i) {
+    return RefreshIndicator(
+      color: AppColors.primary,
+      backgroundColor: context.colors.card,
+      onRefresh: _load,
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+        itemCount: _members.length,
+        itemBuilder: (_, i) {
         final m = _members[i];
         final isMe = (m['id'] as String?) == myId;
         final role = m['role'] as String? ?? 'vo';
@@ -500,7 +504,8 @@ class _CrewManagementScreenState extends State<CrewManagementScreen> {
                 const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
           ),
         );
-      },
+        },
+      ),
     );
   }
 

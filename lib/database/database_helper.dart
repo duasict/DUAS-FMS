@@ -15,7 +15,7 @@ import '../services/org_settings_service.dart';
 
 class DatabaseHelper {
   static const _dbName = 'uas_fms.db';
-  static const _dbVersion = 8;
+  static const _dbVersion = 9;
 
   DatabaseHelper._();
   static final DatabaseHelper instance = DatabaseHelper._();
@@ -238,6 +238,11 @@ class DatabaseHelper {
       await db.execute(
           'ALTER TABLE crew_members ADD COLUMN user_id TEXT');
     }
+    if (oldVersion < 9) {
+      // ── alerts: add mission_ref for direct Supabase write-back by CRP
+      await db.execute(
+          'ALTER TABLE alerts ADD COLUMN mission_ref TEXT DEFAULT NULL');
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -309,6 +314,7 @@ class DatabaseHelper {
         status TEXT NOT NULL,
         mission_id INTEGER,
         mission_title TEXT,
+        mission_ref TEXT,
         is_read INTEGER DEFAULT 0,
         created_at TEXT NOT NULL,
         is_synced INTEGER DEFAULT 0
@@ -935,6 +941,38 @@ class DatabaseHelper {
   Future<int> insertAlert(AlertModel a) async {
     final db = await database;
     return db.insert('alerts', a.toMap());
+  }
+
+  /// Inserts a 'concurrence' alert for [missionRef] unless one already exists
+  /// with status 'pending' for the same ref.  Returns the new row id, or -1
+  /// if a pending alert is already present (idempotent on repeat calls).
+  Future<int> upsertConcurrenceAlert({
+    required String missionRef,
+    required String missionTitle,
+    int? missionLocalId,
+  }) async {
+    final db = await database;
+    final existing = await db.query(
+      'alerts',
+      where: 'type = ? AND mission_ref = ? AND status = ?',
+      whereArgs: ['concurrence', missionRef, 'pending'],
+      limit: 1,
+    );
+    if (existing.isNotEmpty) return -1;
+
+    return db.insert('alerts', {
+      'type': 'concurrence',
+      'title': 'Concurrence Required — $missionRef',
+      'message':
+          'Mission "$missionTitle" requires your approval before operations can begin.',
+      'status': 'pending',
+      'mission_id': missionLocalId,
+      'mission_title': missionTitle,
+      'mission_ref': missionRef,
+      'is_read': 0,
+      'created_at': DateTime.now().toIso8601String(),
+      'is_synced': 0,
+    });
   }
 
   // ─── Checklist ────────────────────────────────────────────────────────────
