@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../../database/database_helper.dart';
 import '../../models/checklist_item.dart';
@@ -101,118 +102,140 @@ class _MissionReportsScreenState
   Future<void> _downloadA1() => _run('A-1', () async {
         final b = await PdfGeneratorService.generateFlightPlan(
             widget.mission, _flightPlan, _hiraRows, _org);
-        await PdfGeneratorService.share(b, _filename('A1', 'FlightPlan'));
+        if (!mounted) return;
+        await PdfGeneratorService.showPdfActions(
+            context, b, _filename('A1', 'FlightPlan'));
       });
 
   Future<void> _downloadA2() => _run('A-2', () async {
         final b = await PdfGeneratorService.generateHira(
             widget.mission, _hiraRows, _org);
-        await PdfGeneratorService.share(b, _filename('A2', 'HIRA'));
+        if (!mounted) return;
+        await PdfGeneratorService.showPdfActions(
+            context, b, _filename('A2', 'HIRA'));
       });
 
   Future<void> _downloadA3() => _run('A-3', () async {
         final b = await PdfGeneratorService.generateEquipmentChecklist(
             widget.mission, _equipmentItems, _org);
-        await PdfGeneratorService.share(
-            b, _filename('A3', 'EquipmentChecklist'));
+        if (!mounted) return;
+        await PdfGeneratorService.showPdfActions(
+            context, b, _filename('A3', 'EquipmentChecklist'));
       });
 
   Future<void> _downloadA4() => _run('A-4', () async {
         final b = await PdfGeneratorService.generateFitToFly(
             widget.mission, _fitToFly, _org);
-        await PdfGeneratorService.share(
-            b, _filename('A4', 'FitToFly'));
+        if (!mounted) return;
+        await PdfGeneratorService.showPdfActions(
+            context, b, _filename('A4', 'FitToFly'));
       });
 
   Future<void> _downloadA5() => _run('A-5', () async {
         final b = await PdfGeneratorService.generatePreflightChecklist(
             widget.mission, _preflightItems, _org);
-        await PdfGeneratorService.share(
-            b, _filename('A5', 'PreflightChecklist'));
+        if (!mounted) return;
+        await PdfGeneratorService.showPdfActions(
+            context, b, _filename('A5', 'PreflightChecklist'));
       });
 
   Future<void> _downloadA6() => _run('A-6', () async {
         final b = await PdfGeneratorService.generateInflightChecklist(
             widget.mission, _inflightItems, _org);
-        await PdfGeneratorService.share(
-            b, _filename('A6', 'InflightChecklist'));
+        if (!mounted) return;
+        await PdfGeneratorService.showPdfActions(
+            context, b, _filename('A6', 'InflightChecklist'));
       });
 
   Future<void> _downloadA7() => _run('A-7', () async {
         final b = await PdfGeneratorService.generatePostflightChecklist(
             widget.mission, _postflightItems, _org);
-        await PdfGeneratorService.share(
-            b, _filename('A7', 'PostflightChecklist'));
+        if (!mounted) return;
+        await PdfGeneratorService.showPdfActions(
+            context, b, _filename('A7', 'PostflightChecklist'));
       });
 
   Future<void> _downloadA8() => _run('A-8', () async {
         final b = await PdfGeneratorService.generateFlightLog(
             widget.mission, _flightLog, _org);
-        await PdfGeneratorService.share(b, _filename('A8', 'FlightLog'));
+        if (!mounted) return;
+        await PdfGeneratorService.showPdfActions(
+            context, b, _filename('A8', 'FlightLog'));
       });
 
   Future<void> _downloadA11(Map<String, dynamic> report) =>
       _run('A-11', () async {
         final b = await PdfGeneratorService.generateIncidentReport(
             widget.mission, report, _org);
-        await PdfGeneratorService.share(
-            b, _filename('A11', 'IncidentReport'));
+        if (!mounted) return;
+        await PdfGeneratorService.showPdfActions(
+            context, b, _filename('A11', 'IncidentReport'));
       });
 
+  /// Downloads all available forms directly to the device (no per-file
+  /// sheet) and shows a single summary snackbar when done.
   Future<void> _downloadAll() => _run('ALL', () async {
         final m = widget.mission;
-        final futures = <Future<void>>[];
+        final tasks = <MapEntry<Future<Uint8List>, String>>[];
+
         if (_flightPlan != null || m.hasFlightPlanComplete) {
-          futures.add(PdfGeneratorService.generateFlightPlan(
-                  m, _flightPlan, _hiraRows, _org)
-              .then((b) => PdfGeneratorService.share(
-                  b, _filename('A1', 'FlightPlan'))));
+          tasks.add(MapEntry(
+              PdfGeneratorService.generateFlightPlan(
+                  m, _flightPlan, _hiraRows, _org),
+              _filename('A1', 'FlightPlan')));
         }
         if (_hiraRows.isNotEmpty || m.hasHiraComplete) {
-          futures.add(PdfGeneratorService.generateHira(m, _hiraRows, _org)
-              .then((b) =>
-                  PdfGeneratorService.share(b, _filename('A2', 'HIRA'))));
+          tasks.add(MapEntry(
+              PdfGeneratorService.generateHira(m, _hiraRows, _org),
+              _filename('A2', 'HIRA')));
         }
         if (m.hasEquipmentComplete) {
-          futures.add(PdfGeneratorService.generateEquipmentChecklist(
-                  m, _equipmentItems, _org)
-              .then((b) => PdfGeneratorService.share(
-                  b, _filename('A3', 'EquipmentChecklist'))));
+          tasks.add(MapEntry(
+              PdfGeneratorService.generateEquipmentChecklist(
+                  m, _equipmentItems, _org),
+              _filename('A3', 'EquipmentChecklist')));
         }
         if (m.hasFitToFlyComplete) {
-          futures.add(
-              PdfGeneratorService.generateFitToFly(m, _fitToFly, _org)
-                  .then((b) => PdfGeneratorService.share(
-                      b, _filename('A4', 'FitToFly'))));
+          tasks.add(MapEntry(
+              PdfGeneratorService.generateFitToFly(m, _fitToFly, _org),
+              _filename('A4', 'FitToFly')));
         }
         if (m.hasPreflightComplete) {
-          futures.add(PdfGeneratorService.generatePreflightChecklist(
-                  m, _preflightItems, _org)
-              .then((b) => PdfGeneratorService.share(
-                  b, _filename('A5', 'PreflightChecklist'))));
+          tasks.add(MapEntry(
+              PdfGeneratorService.generatePreflightChecklist(
+                  m, _preflightItems, _org),
+              _filename('A5', 'PreflightChecklist')));
         }
         if (m.hasInflightComplete) {
-          futures.add(PdfGeneratorService.generateInflightChecklist(
-                  m, _inflightItems, _org)
-              .then((b) => PdfGeneratorService.share(
-                  b, _filename('A6', 'InflightChecklist'))));
+          tasks.add(MapEntry(
+              PdfGeneratorService.generateInflightChecklist(
+                  m, _inflightItems, _org),
+              _filename('A6', 'InflightChecklist')));
         }
         if (m.hasPostflightComplete) {
-          futures.add(PdfGeneratorService.generatePostflightChecklist(
-                  m, _postflightItems, _org)
-              .then((b) => PdfGeneratorService.share(
-                  b, _filename('A7', 'PostflightChecklist'))));
+          tasks.add(MapEntry(
+              PdfGeneratorService.generatePostflightChecklist(
+                  m, _postflightItems, _org),
+              _filename('A7', 'PostflightChecklist')));
         }
         if (m.hasFlightlogComplete) {
-          futures.add(
-              PdfGeneratorService.generateFlightLog(m, _flightLog, _org)
-                  .then((b) => PdfGeneratorService.share(
-                      b, _filename('A8', 'FlightLog'))));
+          tasks.add(MapEntry(
+              PdfGeneratorService.generateFlightLog(m, _flightLog, _org),
+              _filename('A8', 'FlightLog')));
         }
-        // Run sequentially to avoid multiple share sheets at once
-        for (final f in futures) {
-          await f;
-        }
+
+        // Generate + save all in parallel; a single failure propagates to _run().
+        await Future.wait(tasks.map((e) =>
+            e.key.then((b) => PdfGeneratorService.saveToDevice(b, e.value))));
+
+        if (!mounted) return;
+        final n = tasks.length;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content:
+              Text('$n PDF${n == 1 ? '' : 's'} saved to FMS_Reports/'),
+          backgroundColor: const Color(0xFF16A34A),
+          duration: const Duration(seconds: 5),
+        ));
       });
 
   // ── Availability helpers ──────────────────────────────────────────────────

@@ -43,7 +43,9 @@ class _IncidentHistoryScreenState extends State<IncidentHistoryScreen> {
       final date = (report['incident_date'] as String? ?? '').replaceAll('-', '');
       final type = (report['incident_type'] as String? ?? 'incident')
           .replaceAll('_', '-');
-      await PdfGeneratorService.share(bytes, 'A11-Incident-$type-$date.pdf');
+      if (!mounted) return;
+      await PdfGeneratorService.showPdfActions(
+          context, bytes, 'A11-Incident-$type-$date.pdf');
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(

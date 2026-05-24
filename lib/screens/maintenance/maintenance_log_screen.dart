@@ -170,7 +170,9 @@ class _MaintenanceLogScreenState extends State<MaintenanceLogScreen> {
         org,
       );
       final safeName = aircraft.name.replaceAll(RegExp(r'[^A-Za-z0-9]+'), '-');
-      await PdfGeneratorService.share(bytes, 'A9-MaintenanceLog-$safeName.pdf');
+      if (!mounted) return;
+      await PdfGeneratorService.showPdfActions(
+          context, bytes, 'A9-MaintenanceLog-$safeName.pdf');
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(

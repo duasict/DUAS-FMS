@@ -160,7 +160,9 @@ class _FleetSummaryScreenState extends State<FleetSummaryScreen> {
         batteryLogs: s.battery,
         incidents: s.incidents,
       );
-      await PdfGeneratorService.share(bytes, 'FleetSummary-$label.pdf');
+      if (!mounted) return;
+      await PdfGeneratorService.showPdfActions(
+          context, bytes, 'FleetSummary-$label.pdf');
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(

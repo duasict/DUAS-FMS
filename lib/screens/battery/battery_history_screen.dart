@@ -43,7 +43,9 @@ class _BatteryHistoryScreenState extends State<BatteryHistoryScreen> {
           await PdfGeneratorService.generateBatteryLog(battId, [log], org);
       final safeId = battId.replaceAll(RegExp(r'[^A-Za-z0-9]+'), '-');
       final date = (log['log_date'] as String? ?? '').replaceAll('-', '');
-      await PdfGeneratorService.share(bytes, 'A10-Battery-$safeId-$date.pdf');
+      if (!mounted) return;
+      await PdfGeneratorService.showPdfActions(
+          context, bytes, 'A10-Battery-$safeId-$date.pdf');
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -62,7 +64,9 @@ class _BatteryHistoryScreenState extends State<BatteryHistoryScreen> {
       final org = await OrgSettingsService.load();
       final bytes = await PdfGeneratorService.generateBatteryLog(
           'All Batteries', _logs, org);
-      await PdfGeneratorService.share(bytes, 'A10-BatteryLogs-All.pdf');
+      if (!mounted) return;
+      await PdfGeneratorService.showPdfActions(
+          context, bytes, 'A10-BatteryLogs-All.pdf');
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(

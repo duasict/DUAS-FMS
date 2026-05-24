@@ -140,7 +140,9 @@ class _BatteryLogScreenState extends State<BatteryLogScreen> {
       final bytes =
           await PdfGeneratorService.generateBatteryLog(label, logs, org);
       final safeId = label.replaceAll(RegExp(r'[^A-Za-z0-9]+'), '-');
-      await PdfGeneratorService.share(bytes, 'A10-BatteryLog-$safeId.pdf');
+      if (!mounted) return;
+      await PdfGeneratorService.showPdfActions(
+          context, bytes, 'A10-BatteryLog-$safeId.pdf');
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(

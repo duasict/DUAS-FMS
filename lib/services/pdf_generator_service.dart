@@ -1,4 +1,7 @@
+import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -1815,9 +1818,183 @@ class PdfGeneratorService {
   }
 
   // ══════════════════════════════════════════════════════════════════════════
+  // PDF delivery helpers
+  // ══════════════════════════════════════════════════════════════════════════
 
-  /// Invokes the platform share/save sheet for the given [bytes].
-  static Future<void> share(Uint8List bytes, String filename) async {
-    await Printing.sharePdf(bytes: bytes, filename: filename);
+  /// Saves [bytes] to the device's **FMS_Reports** folder and returns the
+  /// absolute path of the saved file.
+  ///
+  /// • Android: app-specific external storage — no `WRITE_EXTERNAL_STORAGE`
+  ///   permission required on API 29+.
+  /// • iOS: app Documents directory — visible in the Files app under the app
+  ///   name.
+  static Future<String> saveToDevice(Uint8List bytes, String filename) async {
+    final Directory base;
+    if (Platform.isAndroid) {
+      final ext = await getExternalStorageDirectory();
+      final root =
+          ext?.path ?? (await getApplicationDocumentsDirectory()).path;
+      base = Directory('$root/FMS_Reports');
+    } else {
+      final docs = await getApplicationDocumentsDirectory();
+      base = Directory('${docs.path}/FMS_Reports');
+    }
+    if (!base.existsSync()) await base.create(recursive: true);
+    final file = File('${base.path}/$filename');
+    await file.writeAsBytes(bytes, flush: true);
+    return file.path;
+  }
+
+  /// Shows a bottom sheet offering **Save to Device** and **Share / Open With**
+  /// actions for the given PDF [bytes].
+  static Future<void> showPdfActions(
+      BuildContext context, Uint8List bytes, String filename) async {
+    // Capture messenger before the sheet opens so it's safe to use after pop.
+    final messenger = ScaffoldMessenger.of(context);
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final surface = Theme.of(ctx).colorScheme.surface;
+        return Container(
+          margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          decoration: BoxDecoration(
+            color: surface,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Drag handle
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(children: [
+                const Icon(Icons.picture_as_pdf_rounded,
+                    color: Color(0xFF2563EB), size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(filename,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600, fontSize: 13),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                ),
+              ]),
+              const SizedBox(height: 20),
+              // ── Save to device ────────────────────────────────────────────
+              _pdfActionTile(
+                ctx,
+                icon: Icons.save_alt_rounded,
+                label: 'Save to Device',
+                description: 'Save PDF to FMS_Reports folder',
+                color: const Color(0xFF2563EB),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  try {
+                    final path = await saveToDevice(bytes, filename);
+                    final parts = path.replaceAll('\\', '/').split('/');
+                    final shortPath = parts.length >= 2
+                        ? '${parts[parts.length - 2]}/${parts.last}'
+                        : parts.last;
+                    messenger.showSnackBar(SnackBar(
+                      content: Text('Saved to …/$shortPath'),
+                      backgroundColor: const Color(0xFF16A34A),
+                      duration: const Duration(seconds: 4),
+                      action: SnackBarAction(
+                        label: 'OK',
+                        textColor: Colors.white,
+                        onPressed: () => messenger.hideCurrentSnackBar(),
+                      ),
+                    ));
+                  } catch (e) {
+                    messenger.showSnackBar(SnackBar(
+                      content: Text('Save failed: $e'),
+                      backgroundColor: const Color(0xFFDC2626),
+                    ));
+                  }
+                },
+              ),
+              const SizedBox(height: 10),
+              // ── Share ─────────────────────────────────────────────────────
+              _pdfActionTile(
+                ctx,
+                icon: Icons.share_rounded,
+                label: 'Share / Open With',
+                description: 'Send via email, cloud, or other apps',
+                color: const Color(0xFF64748B),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  await Printing.sharePdf(bytes: bytes, filename: filename);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  static Widget _pdfActionTile(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required String description,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            border: Border.all(color: color.withValues(alpha: 0.3)),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label,
+                      style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          color: color)),
+                  Text(description,
+                      style: const TextStyle(
+                          fontSize: 11, color: Color(0xFF94A3B8))),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right,
+                color: color.withValues(alpha: 0.5), size: 18),
+          ]),
+        ),
+      ),
+    );
   }
 }

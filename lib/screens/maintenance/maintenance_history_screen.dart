@@ -71,7 +71,9 @@ class _MaintenanceHistoryScreenState extends State<MaintenanceHistoryScreen> {
       );
       final date = (log['maintenance_date'] as String? ?? '').replaceAll('-', '');
       final safeName = aircraftName.replaceAll(RegExp(r'[^A-Za-z0-9]+'), '-');
-      await PdfGeneratorService.share(bytes, 'A9-Maint-$safeName-$date.pdf');
+      if (!mounted) return;
+      await PdfGeneratorService.showPdfActions(
+          context, bytes, 'A9-Maint-$safeName-$date.pdf');
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -94,7 +96,9 @@ class _MaintenanceHistoryScreenState extends State<MaintenanceHistoryScreen> {
         _logs,
         org,
       );
-      await PdfGeneratorService.share(bytes, 'A9-MaintenanceLogs-All.pdf');
+      if (!mounted) return;
+      await PdfGeneratorService.showPdfActions(
+          context, bytes, 'A9-MaintenanceLogs-All.pdf');
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
