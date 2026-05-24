@@ -24,6 +24,9 @@ class AppProvider extends ChangeNotifier {
   static const _pageSize = 20;
   bool _hasMoreMissions = false;
   bool get hasMoreMissions => _hasMoreMissions;
+  // Guard flag: prevents the scroll listener from firing concurrent DB reads
+  // that would compute the same OFFSET and append duplicate mission rows.
+  bool _isLoadingMore = false;
 
   StreamSubscription? _connectivitySub;
 
@@ -184,26 +187,33 @@ class AppProvider extends ChangeNotifier {
   }
 
   /// Appends the next page of missions (DB LIMIT/OFFSET).
-  /// No-op if [hasMoreMissions] is false.
+  /// No-op if [hasMoreMissions] is false or a load is already in flight
+  /// (prevents the scroll listener from issuing concurrent reads at the same
+  /// OFFSET, which would append duplicate rows).
   Future<void> loadMoreMissions() async {
-    if (!_hasMoreMissions) return;
-    final db = DatabaseHelper.instance;
-    final profile = await db.getUserProfile();
-    final more = await db.getMissionsForUserPaged(
-      profile?.name ?? '',
-      profile?.role == 'crp',
-      userId: profile?.supabaseId ?? '',
-      limit: _pageSize,
-      offset: _missions.length,
-    );
-    if (more.isEmpty) {
-      _hasMoreMissions = false;
+    if (!_hasMoreMissions || _isLoadingMore) return;
+    _isLoadingMore = true;
+    try {
+      final db = DatabaseHelper.instance;
+      final profile = await db.getUserProfile();
+      final more = await db.getMissionsForUserPaged(
+        profile?.name ?? '',
+        profile?.role == 'crp',
+        userId: profile?.supabaseId ?? '',
+        limit: _pageSize,
+        offset: _missions.length,
+      );
+      if (more.isEmpty) {
+        _hasMoreMissions = false;
+        notifyListeners();
+        return;
+      }
+      _missions = [..._missions, ...more];
+      _hasMoreMissions = more.length >= _pageSize;
       notifyListeners();
-      return;
+    } finally {
+      _isLoadingMore = false;
     }
-    _missions = [..._missions, ...more];
-    _hasMoreMissions = more.length >= _pageSize;
-    notifyListeners();
   }
 
   Future<void> syncData() async {

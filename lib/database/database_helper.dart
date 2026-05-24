@@ -971,7 +971,9 @@ class DatabaseHelper {
       'mission_ref': missionRef,
       'is_read': 0,
       'created_at': DateTime.now().toIso8601String(),
-      'is_synced': 0,
+      // Alerts are never pushed to Supabase — mark as synced immediately so
+      // they don't inflate the "unsynced records" badge.
+      'is_synced': 1,
     });
   }
 
@@ -1095,8 +1097,10 @@ class DatabaseHelper {
   Future<int> getUnsyncedCount() async {
     final db = await database;
     int total = 0;
+    // 'alerts' is excluded: alert rows are client-side only and never pushed to
+    // Supabase, so counting them as "unsynced" would mislead the UI banner.
     for (final table in [
-      'missions', 'alerts', 'flight_logs',
+      'missions', 'flight_logs',
       'maintenance_logs', 'battery_logs', 'incident_reports',
     ]) {
       final result = await db
@@ -1109,8 +1113,12 @@ class DatabaseHelper {
   Future<void> markAllSynced() async {
     final db = await database;
     final batch = db.batch();
+    // 'missions' and 'flight_logs' are intentionally excluded:
+    //   they are marked per-mission in SyncService._syncMission →
+    //   markMissionSynced(), ensuring that any mission whose upload threw
+    //   stays is_synced=0 and retries on the next sync cycle.
+    // 'alerts' is excluded: alert rows are never pushed to Supabase.
     for (final table in [
-      'missions', 'alerts', 'flight_logs',
       'maintenance_logs', 'battery_logs', 'incident_reports',
     ]) {
       batch.update(table, {'is_synced': 1}, where: 'is_synced = 0');
@@ -1248,15 +1256,21 @@ class DatabaseHelper {
       String userName, bool isCrp, {String userId = ''}) async {
     final db = await database;
     final List<Map<String, dynamic>> rows;
+    // Sort: active missions (planning/in_progress) first so they always appear
+    // in the first paginated page, then older completed ones in date order.
+    const statusOrder =
+        "CASE WHEN status IN ('planning','in_progress') THEN 0 ELSE 1 END ASC, date ASC";
     if (isCrp || userName.trim().isEmpty) {
-      rows = await db.query('missions', orderBy: 'date ASC');
+      rows = await db.rawQuery('SELECT * FROM missions ORDER BY $statusOrder');
     } else {
       rows = await db.rawQuery('''
         SELECT DISTINCT m.* FROM missions m
         INNER JOIN crew_members c ON c.mission_id = m.id
         WHERE c.name = ?
           OR (c.user_id IS NOT NULL AND c.user_id != '' AND c.user_id = ?)
-        ORDER BY m.date ASC
+        ORDER BY
+          CASE WHEN m.status IN ('planning','in_progress') THEN 0 ELSE 1 END ASC,
+          m.date ASC
       ''', [userName.trim(), userId]);
     }
     final missions = rows.map(Mission.fromMap).toList();
@@ -1277,12 +1291,15 @@ class DatabaseHelper {
   }) async {
     final db = await database;
     final List<Map<String, dynamic>> rows;
+    // Sort: active missions (planning/in_progress) first so that the first page
+    // always contains all active missions, preventing the dashboard from showing
+    // "No upcoming missions" for users who have many completed missions.
     if (isCrp || userName.trim().isEmpty) {
-      rows = await db.query(
-        'missions',
-        orderBy: 'date ASC',
-        limit: limit,
-        offset: offset,
+      rows = await db.rawQuery(
+        "SELECT * FROM missions "
+        "ORDER BY CASE WHEN status IN ('planning','in_progress') THEN 0 ELSE 1 END ASC, "
+        "date ASC LIMIT ? OFFSET ?",
+        [limit, offset],
       );
     } else {
       rows = await db.rawQuery('''
@@ -1290,7 +1307,9 @@ class DatabaseHelper {
         INNER JOIN crew_members c ON c.mission_id = m.id
         WHERE c.name = ?
           OR (c.user_id IS NOT NULL AND c.user_id != '' AND c.user_id = ?)
-        ORDER BY m.date ASC
+        ORDER BY
+          CASE WHEN m.status IN ('planning','in_progress') THEN 0 ELSE 1 END ASC,
+          m.date ASC
         LIMIT ? OFFSET ?
       ''', [userName.trim(), userId, limit, offset]);
     }
