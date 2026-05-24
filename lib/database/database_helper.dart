@@ -1009,6 +1009,26 @@ class DatabaseHelper {
     await batch.commit(noResult: true);
   }
 
+  /// Returns a map of {checklistType → unchecked item count} for every
+  /// checklist type that still has items with status = 0 for this mission.
+  /// An empty map means every item across all four checklist types is answered.
+  Future<Map<String, int>> getUncheckedChecklistGaps(int missionId) async {
+    final db = await database;
+    final rows = await db.rawQuery(
+      '''
+      SELECT checklist_type, COUNT(*) AS cnt
+      FROM checklist_items
+      WHERE mission_id = ? AND status = 0
+      GROUP BY checklist_type
+      ''',
+      [missionId],
+    );
+    return {
+      for (final r in rows)
+        r['checklist_type'] as String: r['cnt'] as int,
+    };
+  }
+
   // ─── Flight Log ───────────────────────────────────────────────────────────
 
   Future<FlightLog?> getFlightLogByMissionId(int missionId) async {

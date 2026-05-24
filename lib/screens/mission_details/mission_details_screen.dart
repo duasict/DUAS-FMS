@@ -94,6 +94,132 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
     _navigateToStep(screen);
   }
 
+  /// Guards the Reports screen: all four checklist types must have zero
+  /// unanswered items (status = 0) before the user can view the report.
+  Future<void> _viewReport() async {
+    final m = _mission;
+    if (m?.id == null) return;
+    final gaps =
+        await DatabaseHelper.instance.getUncheckedChecklistGaps(m!.id!);
+    if (!mounted) return;
+
+    if (gaps.isEmpty) {
+      Navigator.push(context,
+          MaterialPageRoute(builder: (_) => MissionReportsScreen(mission: m)));
+      return;
+    }
+
+    // Show a blocking dialog listing which checklists still have gaps,
+    // with a direct navigation link to each one so the user can fix them.
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: ctx.colors.card,
+        title: Row(children: [
+          const Icon(Icons.warning_amber_rounded,
+              color: AppColors.warning, size: 20),
+          const SizedBox(width: 8),
+          Text('Incomplete Checklists',
+              style: TextStyle(
+                  color: ctx.colors.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600)),
+        ]),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'All checklist items must be answered (Pass or Fail) '
+              'before the flight report can be accessed.',
+              style: TextStyle(
+                  color: ctx.colors.textSecondary,
+                  fontSize: 13,
+                  height: 1.5),
+            ),
+            const SizedBox(height: 14),
+            ...gaps.entries.map((e) {
+              final n = e.value;
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
+                decoration: BoxDecoration(
+                  color: AppColors.warning.withValues(alpha: 0.07),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                      color: AppColors.warning.withValues(alpha: 0.3)),
+                ),
+                child: Row(children: [
+                  const Icon(Icons.warning_amber_rounded,
+                      color: AppColors.warning, size: 14),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${_checklistLabel(e.key)} — '
+                      '$n unanswered ${n == 1 ? 'item' : 'items'}',
+                      style: TextStyle(
+                          color: ctx.colors.textPrimary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                  TextButton(
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _navigateToStep(
+                          _checklistScreen(e.key, m.id!, m.title));
+                    },
+                    child: const Text('Go to →',
+                        style: TextStyle(
+                            color: AppColors.accent, fontSize: 12)),
+                  ),
+                ]),
+              );
+            }),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Dismiss',
+                style: TextStyle(color: ctx.colors.textSecondary)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _checklistLabel(String type) {
+    switch (type) {
+      case 'equipment':  return 'Equipment';
+      case 'preflight':  return 'Pre-flight';
+      case 'inflight':   return 'In-flight';
+      case 'postflight': return 'Post-flight';
+      default:           return type;
+    }
+  }
+
+  Widget _checklistScreen(String type, int id, String title) {
+    switch (type) {
+      case 'equipment':
+        return EquipmentChecklistScreen(missionId: id, missionTitle: title);
+      case 'preflight':
+        return PreflightChecklistScreen(missionId: id, missionTitle: title);
+      case 'inflight':
+        return InflightChecklistScreen(missionId: id, missionTitle: title);
+      case 'postflight':
+        return PostflightChecklistScreen(missionId: id, missionTitle: title);
+      default:
+        return PreflightChecklistScreen(missionId: id, missionTitle: title);
+    }
+  }
+
   Color _statusColor(String s) {
     switch (s) {
       case 'completed':  return AppColors.success;
@@ -300,6 +426,7 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
       bottomNavigationBar: _BottomAction(
         mission: m,
         onContinue: _navigateToNextStep,
+        onViewReport: _viewReport,
       ),
     );
   }
@@ -780,7 +907,12 @@ class _CompletionCard extends StatelessWidget {
 class _BottomAction extends StatelessWidget {
   final Mission mission;
   final VoidCallback onContinue;
-  const _BottomAction({required this.mission, required this.onContinue});
+  final VoidCallback onViewReport;
+  const _BottomAction({
+    required this.mission,
+    required this.onContinue,
+    required this.onViewReport,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -821,13 +953,7 @@ class _BottomAction extends StatelessWidget {
             width: double.infinity,
             height: 50,
             child: OutlinedButton.icon(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                      MissionReportsScreen(mission: mission),
-                ),
-              ),
+              onPressed: onViewReport,
               icon: const Icon(Icons.description_outlined, size: 18),
               label: const Text('View Flight Report'),
             ),
