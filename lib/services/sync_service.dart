@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart';
 
 import '../database/database_helper.dart';
 import '../models/mission.dart';
@@ -51,8 +52,9 @@ class SyncService {
         try {
           await _syncMission(mission, orgId, userId);
           synced++;
-        } catch (_) {
-          // skip this mission; it will retry next sync
+        } catch (e, st) {
+          debugPrint('[SyncService] mission ${mission.missionId} sync error: $e\n$st');
+          // Skip this mission; it will retry on next sync
         }
       }
 

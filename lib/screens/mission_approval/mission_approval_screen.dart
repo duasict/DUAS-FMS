@@ -185,17 +185,9 @@ class _MissionApprovalScreenState extends State<MissionApprovalScreen> {
       ? 0
       : _hiraRows.map((r) => r.risk).reduce((a, b) => a > b ? a : b);
 
-  Color _riskColor(int r) {
-    if (r <= 4) return AppColors.success;
-    if (r <= 8) return AppColors.warning;
-    return AppColors.danger;
-  }
-
-  String _riskLabel(int r) {
-    if (r <= 4) return 'Low';
-    if (r <= 8) return 'Medium';
-    return 'High';
-  }
+  // Delegate to HiraRow static helpers — single source of truth
+  Color  _riskColor(int r) => HiraRow.colorForScore(r);
+  String _riskLabel(int r) => HiraRow.categoryForScore(r);
 
   @override
   Widget build(BuildContext context) {

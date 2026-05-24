@@ -98,6 +98,10 @@ class FaceRecognitionService {
     required Uint8List idFaceBytes,
     required Uint8List selfieBytes,
   }) async {
+    // Auto-initialize on first use so callers don't need to call initialize()
+    // explicitly. initialize() is idempotent — subsequent calls return immediately.
+    if (!_initialized) await initialize();
+
     if (!_modelAvailable || _modelTempPath == null) {
       return const FaceMatchResult(
         score: null,

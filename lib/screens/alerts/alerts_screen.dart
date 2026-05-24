@@ -232,38 +232,42 @@ class _AlertDetailSheetState extends State<_AlertDetailSheet> {
   Future<void> _decide(String decision) async {
     final mId = widget.alert.missionId;
     setState(() => _isSaving = true);
-
-    // Write status to the mission record (if linked)
-    if (mId != null) {
-      final mission = await DatabaseHelper.instance.getMissionById(mId);
-      if (mission != null) {
-        mission.crpConcurrenceStatus = decision;
-        await DatabaseHelper.instance.updateMission(mission);
+    try {
+      // Write concurrence status to the mission record (if linked)
+      if (mId != null) {
+        final mission = await DatabaseHelper.instance.getMissionById(mId);
+        if (mission != null) {
+          await DatabaseHelper.instance.updateMission(
+              mission.copyWith(crpConcurrenceStatus: decision));
+        }
       }
+
+      // Update alert row so it no longer shows as pending
+      if (widget.alert.id != null) {
+        await DatabaseHelper.instance
+            .updateAlertStatus(widget.alert.id!, decision);
+      }
+
+      if (!mounted) return;
+
+      // Capture context-dependent objects before the final async gap
+      final navigator = Navigator.of(context);
+      final messenger = ScaffoldMessenger.of(context);
+      final provider  = context.read<AppProvider>();
+
+      // Refresh all providers so dashboard stats and banner update immediately
+      await provider.refresh();
+
+      navigator.pop();
+      messenger.showSnackBar(SnackBar(
+        content: Text(
+            decision == 'approved' ? 'Mission approved.' : 'Mission rejected.'),
+        backgroundColor:
+            decision == 'approved' ? AppColors.success : AppColors.danger,
+      ));
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
-
-    // Update alert row so it no longer shows as pending
-    if (widget.alert.id != null) {
-      await DatabaseHelper.instance.updateAlertStatus(widget.alert.id!, decision);
-    }
-
-    if (!mounted) return;
-
-    // Capture context-dependent objects before the final async gap
-    final navigator = Navigator.of(context);
-    final messenger = ScaffoldMessenger.of(context);
-    final provider  = context.read<AppProvider>();
-
-    // Refresh all providers so dashboard stat and banner update immediately
-    await provider.refresh();
-
-    navigator.pop();
-    messenger.showSnackBar(SnackBar(
-      content: Text(
-          decision == 'approved' ? 'Mission approved.' : 'Mission rejected.'),
-      backgroundColor:
-          decision == 'approved' ? AppColors.success : AppColors.danger,
-    ));
   }
 
   @override

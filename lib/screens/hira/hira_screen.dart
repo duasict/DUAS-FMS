@@ -37,19 +37,9 @@ class _RowEntry {
 
   int get risk => likelihood * impact;
 
-  Color get riskColor {
-    final r = risk;
-    if (r <= 4) return AppColors.success;
-    if (r <= 8) return AppColors.warning;
-    return AppColors.danger;
-  }
-
-  String get riskLabel {
-    final r = risk;
-    if (r <= 4) return 'Low';
-    if (r <= 8) return 'Medium';
-    return 'High';
-  }
+  // Delegate to HiraRow static helpers — single source of truth
+  Color  get riskColor => HiraRow.colorForScore(risk);
+  String get riskLabel => HiraRow.categoryForScore(risk);
 
   void dispose() {
     hazardCtrl.dispose();

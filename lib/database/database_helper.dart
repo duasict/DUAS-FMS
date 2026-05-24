@@ -271,6 +271,8 @@ class DatabaseHelper {
         has_inflight_complete INTEGER DEFAULT 0,
         has_postflight_complete INTEGER DEFAULT 0,
         has_flightlog_complete INTEGER DEFAULT 0,
+        -- Carried over from v2 migration for schema consistency on fresh installs
+        has_approval_complete INTEGER DEFAULT 0,
         is_synced INTEGER DEFAULT 0,
         created_at TEXT NOT NULL
       )
@@ -417,6 +419,8 @@ class DatabaseHelper {
         license_expiry_date TEXT NOT NULL DEFAULT '',
         license_verified INTEGER NOT NULL DEFAULT 0,
         face_verified INTEGER NOT NULL DEFAULT 0,
+        -- Carried over from v3 migration for schema consistency on fresh installs
+        rank TEXT NOT NULL DEFAULT '',
         phone TEXT NOT NULL DEFAULT '',
         photo_path TEXT DEFAULT '',
         organization_id TEXT NOT NULL DEFAULT ''
@@ -1112,6 +1116,20 @@ class DatabaseHelper {
     return db.query('incident_reports', orderBy: 'incident_date DESC');
   }
 
+  /// Returns only the incident reports linked to [missionId].
+  /// Prefer this over [getIncidentReports] + client-side filter to avoid
+  /// loading the entire table into memory.
+  Future<List<Map<String, dynamic>>> getIncidentsByMissionId(
+      int missionId) async {
+    final db = await database;
+    return db.query(
+      'incident_reports',
+      where: 'mission_id = ?',
+      whereArgs: [missionId],
+      orderBy: 'incident_date DESC',
+    );
+  }
+
   // ─── Flight Plans ─────────────────────────────────────────────────────────
 
   Future<FlightPlan?> getFlightPlanByMissionId(int missionId) async {
@@ -1171,12 +1189,15 @@ class DatabaseHelper {
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
   Future<String> nextMissionId() async {
-    final db    = await database;
-    final year  = DateTime.now().year;
-    final org   = await OrgSettingsService.load();
+    final db     = await database;
+    final year   = DateTime.now().year;
+    final org    = await OrgSettingsService.load();
     final prefix = '${org.missionPrefix}-$year-';
+    // Use a parameterized query to prevent SQL injection from a user-controlled
+    // org prefix (e.g. a prefix containing a single quote or LIKE metacharacter).
     final result = await db.rawQuery(
-        "SELECT COUNT(*) as c FROM missions WHERE mission_id LIKE '$prefix%'");
+        'SELECT COUNT(*) as c FROM missions WHERE mission_id LIKE ?',
+        ['$prefix%']);
     final count = ((result.first['c'] as int?) ?? 0) + 1;
     return '$prefix${count.toString().padLeft(3, '0')}';
   }

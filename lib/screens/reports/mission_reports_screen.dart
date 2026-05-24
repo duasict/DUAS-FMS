@@ -54,24 +54,22 @@ class _MissionReportsScreenState
       db.getChecklistItems(id, 'inflight'),
       db.getChecklistItems(id, 'postflight'),
       db.getFlightLogByMissionId(id),
-      db.getIncidentReports(),
+      db.getIncidentsByMissionId(id),   // filtered at DB level — no client-side scan
       OrgSettingsService.load(),
     ]);
 
     if (!mounted) return;
     setState(() {
-      _flightPlan = results[0] as FlightPlan?;
-      _hiraRows = results[1] as List<HiraRow>;
-      _equipmentItems = results[2] as List<ChecklistItem>;
-      _fitToFly = results[3] as Map<String, dynamic>?;
-      _preflightItems = results[4] as List<ChecklistItem>;
-      _inflightItems = results[5] as List<ChecklistItem>;
-      _postflightItems = results[6] as List<ChecklistItem>;
-      _flightLog = results[7] as FlightLog?;
-      _missionIncidents = (results[8] as List<Map<String, dynamic>>)
-          .where((r) => r['mission_id'] == id)
-          .toList();
-      _org = results[9] as OrgSettings;
+      _flightPlan       = results[0] as FlightPlan?;
+      _hiraRows         = results[1] as List<HiraRow>;
+      _equipmentItems   = results[2] as List<ChecklistItem>;
+      _fitToFly         = results[3] as Map<String, dynamic>?;
+      _preflightItems   = results[4] as List<ChecklistItem>;
+      _inflightItems    = results[5] as List<ChecklistItem>;
+      _postflightItems  = results[6] as List<ChecklistItem>;
+      _flightLog        = results[7] as FlightLog?;
+      _missionIncidents = results[8] as List<Map<String, dynamic>>;
+      _org              = results[9] as OrgSettings;
       _loaded = true;
     });
   }

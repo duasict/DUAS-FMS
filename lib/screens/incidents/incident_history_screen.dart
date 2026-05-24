@@ -60,7 +60,7 @@ class _IncidentHistoryScreenState extends State<IncidentHistoryScreen> {
     switch (s) {
       case 'moderate': return AppColors.warning;
       case 'serious':  return AppColors.danger;
-      case 'fatal':    return const Color(0xFF7B0000);
+      case 'fatal':    return AppColors.dangerDark;
       default:         return AppColors.success;
     }
   }

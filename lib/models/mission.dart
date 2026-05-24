@@ -17,7 +17,7 @@ class Mission {
   String aircraftType;   // multi-rotor | vtol | fixed-wing
   int? duration;         // total flight minutes
 
-  // CRP concurrence fields (replaces approved_by + hazard_risk + risk_level)
+  // CRP concurrence fields
   String crpAdvisoryNotes;
   bool crpConcurrenceRequired;
   /// '' = not yet reviewed  |  'approved' = CRP approved  |  'rejected' = CRP rejected
@@ -131,6 +131,76 @@ class Mission {
     return allowed[from]?.contains(to) ?? false;
   }
 
+  Mission copyWith({
+    int? id,
+    String? missionId,
+    String? title,
+    String? status,
+    String? date,
+    String? timeStr,
+    String? location,
+    double? latitude,
+    double? longitude,
+    String? environment,
+    String? objective,
+    int? aircraftId,
+    String? aircraftName,
+    String? aircraftType,
+    int? duration,
+    String? crpAdvisoryNotes,
+    bool? crpConcurrenceRequired,
+    String? crpConcurrenceStatus,
+    String? organizationId,
+    String? createdBy,
+    bool? hasFlightPlanComplete,
+    bool? hasHiraComplete,
+    bool? hasEquipmentComplete,
+    bool? hasFitToFlyComplete,
+    bool? hasPreflightComplete,
+    bool? hasInflightComplete,
+    bool? hasPostflightComplete,
+    bool? hasFlightlogComplete,
+    bool? isSynced,
+    String? createdAt,
+    List<CrewMember>? crew,
+  }) =>
+      Mission(
+        id: id ?? this.id,
+        missionId: missionId ?? this.missionId,
+        title: title ?? this.title,
+        status: status ?? this.status,
+        date: date ?? this.date,
+        timeStr: timeStr ?? this.timeStr,
+        location: location ?? this.location,
+        latitude: latitude ?? this.latitude,
+        longitude: longitude ?? this.longitude,
+        environment: environment ?? this.environment,
+        objective: objective ?? this.objective,
+        aircraftId: aircraftId ?? this.aircraftId,
+        aircraftName: aircraftName ?? this.aircraftName,
+        aircraftType: aircraftType ?? this.aircraftType,
+        duration: duration ?? this.duration,
+        crpAdvisoryNotes: crpAdvisoryNotes ?? this.crpAdvisoryNotes,
+        crpConcurrenceRequired:
+            crpConcurrenceRequired ?? this.crpConcurrenceRequired,
+        crpConcurrenceStatus: crpConcurrenceStatus ?? this.crpConcurrenceStatus,
+        organizationId: organizationId ?? this.organizationId,
+        createdBy: createdBy ?? this.createdBy,
+        hasFlightPlanComplete:
+            hasFlightPlanComplete ?? this.hasFlightPlanComplete,
+        hasHiraComplete: hasHiraComplete ?? this.hasHiraComplete,
+        hasEquipmentComplete: hasEquipmentComplete ?? this.hasEquipmentComplete,
+        hasFitToFlyComplete: hasFitToFlyComplete ?? this.hasFitToFlyComplete,
+        hasPreflightComplete: hasPreflightComplete ?? this.hasPreflightComplete,
+        hasInflightComplete: hasInflightComplete ?? this.hasInflightComplete,
+        hasPostflightComplete:
+            hasPostflightComplete ?? this.hasPostflightComplete,
+        hasFlightlogComplete: hasFlightlogComplete ?? this.hasFlightlogComplete,
+        isSynced: isSynced ?? this.isSynced,
+        createdAt: createdAt ?? this.createdAt,
+        crew: crew ?? this.crew,
+      );
+
   Map<String, dynamic> toMap() {
     return {
       if (id != null) 'id': id,
@@ -172,9 +242,6 @@ class Mission {
   bool get isPlanning => status == 'planning';
   bool get isInProgress => status == 'in_progress';
   bool get isCancelled => status == 'cancelled';
-
-  /// True if the post-flight step is done — at this point navigation is locked.
-  bool get isPostFlightDone => hasPostflightComplete;
 
   String get statusLabel {
     switch (status) {

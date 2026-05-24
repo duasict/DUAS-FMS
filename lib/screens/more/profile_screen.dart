@@ -321,7 +321,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               decoration: BoxDecoration(
                 color: AppColors.primary,
                 shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFF0B0F1A), width: 2),
+                border: Border.all(color: context.colors.background, width: 2),
               ),
               child: const Icon(Icons.camera_alt, color: Colors.white, size: 15),
             ),

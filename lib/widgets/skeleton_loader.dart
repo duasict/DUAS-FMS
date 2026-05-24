@@ -22,8 +22,10 @@ class SkeletonBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final base = isDark ? const Color(0xFF2A2D3E) : const Color(0xFFE2E8F0);
-    final highlight = isDark ? const Color(0xFF3A3D50) : const Color(0xFFF8FAFC);
+    final c = context.colors;
+    // Use theme tokens so shimmer adapts automatically when the palette changes
+    final base      = isDark ? c.card   : c.border;
+    final highlight = isDark ? c.border : c.surface;
 
     return Shimmer.fromColors(
       baseColor: base,

@@ -138,20 +138,20 @@ class _BaseChecklistScreenState extends State<BaseChecklistScreen> {
   }
 
   List<Widget> _buildSections() {
-    final sections = <String>[];
-    for (final item in _items) {
-      if (!sections.contains(item.section)) sections.add(item.section);
+    // Build a section→[indices] map in O(N) — avoids O(N²) indexOf calls.
+    final sectionIndices = <String, List<int>>{};
+    for (var i = 0; i < _items.length; i++) {
+      (sectionIndices[_items[i].section] ??= []).add(i);
     }
+
     final widgets = <Widget>[];
-    for (final section in sections) {
-      widgets.add(ChecklistSectionHeader(label: section));
-      final sectionItems = _items.where((i) => i.section == section).toList();
-      for (final item in sectionItems) {
-        final idx = _items.indexOf(item);
+    for (final entry in sectionIndices.entries) {
+      widgets.add(ChecklistSectionHeader(label: entry.key));
+      for (final idx in entry.value) {
         widgets.add(ChecklistTile(
-          text: item.text,
-          status: item.status,
-          remark: item.remark,
+          text: _items[idx].text,
+          status: _items[idx].status,
+          remark: _items[idx].remark,
           onChanged: (s, r) => setState(() {
             _items[idx].status = s;
             _items[idx].remark = r;

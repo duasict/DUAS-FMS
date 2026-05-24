@@ -4,6 +4,7 @@ import '../../providers/org_settings_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/user_profile_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/app_constants.dart';
 import '../onboarding/org_setup_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -44,7 +45,7 @@ class SettingsScreen extends StatelessWidget {
             context,
             icon: Icons.info_outline,
             title: 'App Version',
-            value: 'UAS FMS v1.0.0',
+            value: 'FMS v${AppConstants.appVersion}',
           ),
           _infoTile(
             context,

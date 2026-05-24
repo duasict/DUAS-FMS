@@ -26,7 +26,8 @@ class _CrewManagementScreenState extends State<CrewManagementScreen> {
   bool _isLoading = true;
   String? _error;
 
-  static const _orgRoles = ['vo', 'rpic', 'crp', 'admin'];
+  // Profile-level roles (must match profiles.role CHECK constraint in schema)
+  static const _orgRoles = ['vo', 'gcs', 'tech', 'pic', 'crp'];
 
   @override
   void initState() {

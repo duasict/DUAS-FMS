@@ -22,15 +22,19 @@ class HiraRow {
 
   int get risk => likelihood * impact;
 
-  String get riskCategory {
-    final r = risk;
+  String get riskCategory => HiraRow.categoryForScore(risk);
+  Color  get riskColor     => HiraRow.colorForScore(risk);
+
+  /// Single source of truth for risk-score → label.
+  /// Low ≤ 4  |  Medium ≤ 8  |  High > 8
+  static String categoryForScore(int r) {
     if (r <= 4) return 'Low';
     if (r <= 8) return 'Medium';
     return 'High';
   }
 
-  Color get riskColor {
-    final r = risk;
+  /// Single source of truth for risk-score → theme color.
+  static Color colorForScore(int r) {
     if (r <= 4) return AppColors.success;
     if (r <= 8) return AppColors.warning;
     return AppColors.danger;

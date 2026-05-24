@@ -90,7 +90,7 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
   /// Navigation is locked once post-flight is done (user remark #7).
   void _navigateToCompletedStep(Widget screen) {
     final m = _mission!;
-    if (m.isPostFlightDone) return; // locked
+    if (m.hasPostflightComplete) return; // locked
     _navigateToStep(screen);
   }
 
@@ -136,8 +136,8 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
     );
     if (confirmed != true || !mounted) return;
 
-    m.status = 'cancelled';
-    final err = await context.read<AppProvider>().updateMission(m);
+    final err = await context.read<AppProvider>().updateMission(
+          m.copyWith(status: 'cancelled'));
     if (!mounted) return;
     if (err != null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -462,7 +462,7 @@ class _ChecklistProgressRow extends StatelessWidget {
     final m = mission;
     final id = m.id!;
     final title = m.title;
-    final locked = m.isPostFlightDone;
+    final locked = m.hasPostflightComplete;
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       _groupLabel(context, 'PRE-DEPLOYMENT'),
