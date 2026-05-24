@@ -89,8 +89,10 @@ class PdfGeneratorService {
             const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: pw.BoxDecoration(
           color: _rowHdr,
-          borderRadius:
-              const pw.BorderRadius.all(pw.Radius.circular(3)),
+          // NOTE: borderRadius is intentionally omitted here.
+          // The pdf package asserts borderRadius == null when the border is
+          // non-uniform (i.e. only certain sides are set). Using Border(left:)
+          // is non-uniform, so borderRadius must not be present.
           border: pw.Border(
               left: pw.BorderSide(color: _accent, width: 3)),
         ),

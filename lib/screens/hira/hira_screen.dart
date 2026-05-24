@@ -391,32 +391,35 @@ class _RatingSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final active = activeColor ?? AppColors.primary;
+    // Use Expanded so buttons fill the available width instead of overflowing
+    // with a fixed 30 px width on narrow screens.
     return Row(
-      mainAxisSize: MainAxisSize.min,
       children: List.generate(5, (i) {
         final v = i + 1;
         final sel = v == value;
-        return GestureDetector(
-          onTap: () => onChanged(v),
-          child: Container(
-            margin: EdgeInsets.only(right: 4),
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
-              color:
-                  sel ? active.withValues(alpha: 0.15) : context.colors.surface,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(
-                  color: sel
-                      ? active.withValues(alpha: 0.7)
-                      : context.colors.border),
-            ),
-            child: Center(
-              child: Text('$v',
-                  style: TextStyle(
-                      color: sel ? active : context.colors.textSecondary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700)),
+        return Expanded(
+          child: GestureDetector(
+            onTap: () => onChanged(v),
+            child: Container(
+              margin: EdgeInsets.only(right: i < 4 ? 4 : 0),
+              height: 30,
+              decoration: BoxDecoration(
+                color: sel
+                    ? active.withValues(alpha: 0.15)
+                    : context.colors.surface,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                    color: sel
+                        ? active.withValues(alpha: 0.7)
+                        : context.colors.border),
+              ),
+              child: Center(
+                child: Text('$v',
+                    style: TextStyle(
+                        color: sel ? active : context.colors.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700)),
+              ),
             ),
           ),
         );
