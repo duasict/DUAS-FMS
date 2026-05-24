@@ -16,20 +16,22 @@ class _Item {
         remark = '';
 }
 
-/// Shared base for Pre-flight, In-flight, and Post-flight checklist screens.
+/// Shared base for Equipment, Pre-flight, In-flight, and Post-flight screens.
 ///
 /// [defs]              — list of (section, itemText) tuples
-/// [checklistType]     — SQLite key: 'preflight' | 'inflight' | 'postflight'
+/// [checklistType]     — SQLite key: 'equipment' | 'preflight' | 'inflight' | 'postflight'
 /// [stepIndex]         — 0-based index for ChecklistProgressBar
+/// [steps]             — optional step labels; defaults to the 4-step flight steps
 /// [submitLabel]       — text shown on the submit button
-/// [onSubmitComplete]  — called after DB save; receives (missionId, missionTitle)
-///                       and is responsible for navigation + mission flag update
+/// [onSubmitComplete]  — called after DB save; receives (context, missionId, missionTitle)
+///                       and is responsible for the mission flag update and navigation
 class BaseChecklistScreen extends StatefulWidget {
   final int missionId;
   final String missionTitle;
   final List<(String, String)> defs;
   final String checklistType;
   final int stepIndex;
+  final List<String>? steps;
   final String submitLabel;
   final Future<void> Function(
       BuildContext context, int missionId, String missionTitle) onSubmitComplete;
@@ -41,6 +43,7 @@ class BaseChecklistScreen extends StatefulWidget {
     required this.defs,
     required this.checklistType,
     required this.stepIndex,
+    this.steps,
     required this.submitLabel,
     required this.onSubmitComplete,
   });
@@ -112,7 +115,8 @@ class _BaseChecklistScreenState extends State<BaseChecklistScreen> {
           preferredSize: const Size.fromHeight(32),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: ChecklistProgressBar(current: widget.stepIndex),
+            child: ChecklistProgressBar(
+                current: widget.stepIndex, steps: widget.steps),
           ),
         ),
       ),

@@ -284,9 +284,10 @@ class _FitToFlyScreenState extends State<FitToFlyScreen> {
   }
 
   List<Widget> _buildSectionB() {
-    final sections = <String>[];
-    for (final item in _sectionB) {
-      if (!sections.contains(item.section)) sections.add(item.section);
+    // Build a section→[indices] map in O(N) — avoids O(N²) indexOf calls.
+    final sectionIndices = <String, List<int>>{};
+    for (var i = 0; i < _sectionB.length; i++) {
+      (sectionIndices[_sectionB[i].section] ??= []).add(i);
     }
     final widgets = <Widget>[];
     widgets.add(const Padding(
@@ -303,16 +304,13 @@ class _FitToFlyScreenState extends State<FitToFlyScreen> {
                 letterSpacing: 0.8)),
       ]),
     ));
-    for (final section in sections) {
-      widgets.add(ChecklistSectionHeader(label: section));
-      final sectionItems =
-          _sectionB.where((i) => i.section == section).toList();
-      for (final item in sectionItems) {
-        final idx = _sectionB.indexOf(item);
+    for (final entry in sectionIndices.entries) {
+      widgets.add(ChecklistSectionHeader(label: entry.key));
+      for (final idx in entry.value) {
         widgets.add(ChecklistTile(
-          text: item.text,
-          status: item.status,
-          remark: item.remark,
+          text: _sectionB[idx].text,
+          status: _sectionB[idx].status,
+          remark: _sectionB[idx].remark,
           onChanged: (s, r) => setState(() {
             _sectionB[idx].status = s;
             _sectionB[idx].remark = r;
