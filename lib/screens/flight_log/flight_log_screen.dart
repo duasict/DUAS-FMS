@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../../models/flight_log.dart';
 import '../../database/database_helper.dart';
 import '../../providers/app_provider.dart';
-import '../../services/sync_service.dart';
 import '../../theme/app_theme.dart';
 import '../checklists/checklist_widgets.dart';
 
@@ -237,11 +236,15 @@ class _FlightLogScreenState extends State<FlightLogScreen> {
     }
 
     if (!mounted) return;
-    final online = await SyncService.isConnected();
-    if (!mounted) return;
+    final online = provider.isOnline;
+    // Fire-and-forget background sync so the completed mission reaches
+    // Supabase immediately without blocking the UI.
+    if (online) provider.syncData();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(online ? 'Flight log saved to cloud ✓' : 'Flight log saved locally — syncs when online'),
+        content: Text(online
+            ? 'Mission completed ✓  Uploading to cloud…'
+            : 'Mission completed — syncs when online'),
         backgroundColor: online ? AppColors.success : AppColors.warning,
         duration: const Duration(seconds: 3),
       ),

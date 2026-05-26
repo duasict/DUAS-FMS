@@ -221,11 +221,12 @@ class AppProvider extends ChangeNotifier {
     _isSyncing = true;
     notifyListeners();
 
-    final success = await SyncService.syncToCloud();
-    if (success) {
-      _unsyncedCount = 0;
-      await _loadAll();
-    }
+    await SyncService.syncToCloud();
+    // Always reload after any sync attempt — missions and log tables are marked
+    // is_synced=1 individually as they succeed, so the unsynced count must be
+    // recalculated from the DB regardless of whether the overall call returned
+    // success or failed partway through.
+    await _loadAll();
 
     _isSyncing = false;
     notifyListeners();

@@ -28,7 +28,15 @@ class SyncService {
   // ── Main sync entry point ─────────────────────────────────────────────────
 
   /// Pushes all unsynced local data to Supabase.
-  /// Returns true when every record was successfully uploaded.
+  ///
+  /// Missions are synced individually; a per-mission failure is logged and
+  /// retried on the next cycle without aborting the rest.  Standalone log
+  /// tables (maintenance, battery, incident) are each isolated in their own
+  /// try/catch and are marked synced only if their upload succeeds.
+  ///
+  /// Returns true when all unsynced missions were uploaded successfully or
+  /// there were no unsynced missions to begin with.  Log-table outcomes are
+  /// handled independently and do not affect the return value.
   static Future<bool> syncToCloud() async {
     if (!await isConnected()) return false;
     if (!SupabaseService.isSignedIn) return false;
