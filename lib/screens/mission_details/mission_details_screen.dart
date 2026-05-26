@@ -198,6 +198,7 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
   String _checklistLabel(String type) {
     switch (type) {
       case 'equipment':  return 'Equipment';
+      case 'fittofly':   return 'Fit-to-Fly';
       case 'preflight':  return 'Pre-flight';
       case 'inflight':   return 'In-flight';
       case 'postflight': return 'Post-flight';
@@ -209,6 +210,8 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
     switch (type) {
       case 'equipment':
         return EquipmentChecklistScreen(missionId: id, missionTitle: title);
+      case 'fittofly':
+        return FitToFlyScreen(missionId: id, missionTitle: title);
       case 'preflight':
         return PreflightChecklistScreen(missionId: id, missionTitle: title);
       case 'inflight':
