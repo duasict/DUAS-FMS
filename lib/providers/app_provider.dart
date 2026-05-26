@@ -135,7 +135,7 @@ class AppProvider extends ChangeNotifier {
     // create local alert records so they appear without a full sync cycle.
     if (_isOnline && SupabaseService.isSignedIn) {
       final profile = await db.getUserProfile();
-      if (profile?.role == 'crp' && profile!.organizationId.isNotEmpty) {
+      if (profile != null && profile.role == 'crp' && profile.organizationId.isNotEmpty) {
         try {
           final pending = await SupabaseService.fetchPendingConcurrences(
               profile.organizationId);

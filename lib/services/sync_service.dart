@@ -58,30 +58,65 @@ class SyncService {
         }
       }
 
-      // Sync standalone logs (not tied to a mission UUID)
+      // Sync standalone logs (not tied to a mission UUID).
+      // Each table is wrapped in its own try/catch so a failure in one table
+      // does not abort the others, and only successfully-uploaded tables are
+      // marked as synced locally.
       final db = DatabaseHelper.instance;
-      final unsyncedMaint = await db.database.then(
-          (d) => d.rawQuery('SELECT * FROM maintenance_logs WHERE is_synced = 0'));
-      if (unsyncedMaint.isNotEmpty) {
-        await SupabaseService.upsertMaintenanceLogs(
-            unsyncedMaint.map((r) => _cleanLogRow(r, orgId)).toList());
+      final dbRaw = await db.database;
+      bool maintSynced = false, battSynced = false, incSynced = false;
+
+      try {
+        final rows = await dbRaw
+            .rawQuery('SELECT * FROM maintenance_logs WHERE is_synced = 0');
+        if (rows.isNotEmpty) {
+          await SupabaseService.upsertMaintenanceLogs(
+              rows.map((r) => _cleanLogRow(r, orgId)).toList());
+        }
+        maintSynced = true;
+      } catch (e, st) {
+        debugPrint('[SyncService] maintenance_logs sync error: $e\n$st');
       }
 
-      final unsyncedBatt = await db.database.then(
-          (d) => d.rawQuery('SELECT * FROM battery_logs WHERE is_synced = 0'));
-      if (unsyncedBatt.isNotEmpty) {
-        await SupabaseService.upsertBatteryLogs(
-            unsyncedBatt.map((r) => _cleanLogRow(r, orgId)).toList());
+      try {
+        final rows = await dbRaw
+            .rawQuery('SELECT * FROM battery_logs WHERE is_synced = 0');
+        if (rows.isNotEmpty) {
+          await SupabaseService.upsertBatteryLogs(
+              rows.map((r) => _cleanLogRow(r, orgId)).toList());
+        }
+        battSynced = true;
+      } catch (e, st) {
+        debugPrint('[SyncService] battery_logs sync error: $e\n$st');
       }
 
-      final unsyncedInc = await db.database.then(
-          (d) => d.rawQuery('SELECT * FROM incident_reports WHERE is_synced = 0'));
-      if (unsyncedInc.isNotEmpty) {
-        await SupabaseService.upsertIncidentReports(
-            unsyncedInc.map((r) => _cleanLogRow(r, orgId)).toList());
+      try {
+        final rows = await dbRaw
+            .rawQuery('SELECT * FROM incident_reports WHERE is_synced = 0');
+        if (rows.isNotEmpty) {
+          await SupabaseService.upsertIncidentReports(
+              rows.map((r) => _cleanLogRow(r, orgId)).toList());
+        }
+        incSynced = true;
+      } catch (e, st) {
+        debugPrint('[SyncService] incident_reports sync error: $e\n$st');
       }
 
-      await db.markAllSynced();
+      // Mark only the tables whose upload succeeded as synced.
+      final batch = dbRaw.batch();
+      if (maintSynced) {
+        batch.update('maintenance_logs', {'is_synced': 1},
+            where: 'is_synced = 0');
+      }
+      if (battSynced) {
+        batch.update('battery_logs', {'is_synced': 1},
+            where: 'is_synced = 0');
+      }
+      if (incSynced) {
+        batch.update('incident_reports', {'is_synced': 1},
+            where: 'is_synced = 0');
+      }
+      await batch.commit(noResult: true);
 
       return synced > 0 || unsyncedMissions.isEmpty;
     } catch (_) {
@@ -156,6 +191,10 @@ class SyncService {
 
     final missionUuid =
         await SupabaseService.upsertMissionGetId(missionPayload);
+    if (missionUuid.isEmpty) {
+      throw Exception(
+          'upsertMissionGetId returned empty UUID for mission ${mission.missionId}');
+    }
 
     // 2 — Crew
     final crewPayload = mission.crew
