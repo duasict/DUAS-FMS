@@ -15,7 +15,7 @@ import '../services/org_settings_service.dart';
 
 class DatabaseHelper {
   static const _dbName = 'uas_fms.db';
-  static const _dbVersion = 9;
+  static const _dbVersion = 10;
 
   DatabaseHelper._();
   static final DatabaseHelper instance = DatabaseHelper._();
@@ -243,6 +243,15 @@ class DatabaseHelper {
       await db.execute(
           'ALTER TABLE alerts ADD COLUMN mission_ref TEXT DEFAULT NULL');
     }
+    if (oldVersion < 10) {
+      // ── missions: drop the unused has_approval_complete column.
+      // SQLite < 3.35.0 does not support DROP COLUMN; silently ignore on older
+      // devices — the column is harmless and nothing reads or writes it.
+      try {
+        await db.execute(
+            'ALTER TABLE missions DROP COLUMN has_approval_complete');
+      } catch (_) {}
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -276,8 +285,6 @@ class DatabaseHelper {
         has_inflight_complete INTEGER DEFAULT 0,
         has_postflight_complete INTEGER DEFAULT 0,
         has_flightlog_complete INTEGER DEFAULT 0,
-        -- Carried over from v2 migration for schema consistency on fresh installs
-        has_approval_complete INTEGER DEFAULT 0,
         is_synced INTEGER DEFAULT 0,
         created_at TEXT NOT NULL
       )

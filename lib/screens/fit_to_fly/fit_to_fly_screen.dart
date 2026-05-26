@@ -20,16 +20,6 @@ class FitToFlyScreen extends StatefulWidget {
   State<FitToFlyScreen> createState() => _FitToFlyScreenState();
 }
 
-class _SectionBItem {
-  final String section;
-  final String text;
-  int status;
-  String remark;
-  _SectionBItem({required this.section, required this.text})
-      : status = 0,
-        remark = '';
-}
-
 class _FitToFlyScreenState extends State<FitToFlyScreen> {
   // Section A controllers
   final _dateCtrl = TextEditingController();
@@ -73,13 +63,13 @@ class _FitToFlyScreenState extends State<FitToFlyScreen> {
     ('F. NAVIGATION & SENSORS', 'Barometer and IMU stable in GCS'),
   ];
 
-  late final List<_SectionBItem> _sectionB;
+  late final List<ChecklistEntry> _sectionB;
 
   @override
   void initState() {
     super.initState();
     _sectionB =
-        _sectionBDefs.map((d) => _SectionBItem(section: d.$1, text: d.$2)).toList();
+        _sectionBDefs.map((d) => ChecklistEntry(section: d.$1, text: d.$2)).toList();
     _loadExisting();
   }
 

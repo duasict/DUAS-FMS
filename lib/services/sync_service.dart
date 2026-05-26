@@ -176,6 +176,7 @@ class SyncService {
       if (mission.duration != null) 'duration': mission.duration,
       'crp_advisory_notes': mission.crpAdvisoryNotes,
       'crp_concurrence_required': mission.crpConcurrenceRequired,
+      'crp_concurrence_status': mission.crpConcurrenceStatus,
       'has_flight_plan_complete': mission.hasFlightPlanComplete,
       'has_hira_complete': mission.hasHiraComplete,
       'has_equipment_complete': mission.hasEquipmentComplete,

@@ -2,6 +2,22 @@ import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  ChecklistEntry
+//
+//  Mutable in-memory state for one checklist item.  Shared by BaseChecklistScreen
+//  and FitToFlyScreen so neither needs its own duplicate private class.
+// ─────────────────────────────────────────────────────────────────────────────
+class ChecklistEntry {
+  final String section;
+  final String text;
+  int status;
+  String remark;
+  ChecklistEntry({required this.section, required this.text})
+      : status = 0,
+        remark = '';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  ChecklistProgressBar
 //
 //  Renders a horizontal step-indicator that is overflow-safe for any number

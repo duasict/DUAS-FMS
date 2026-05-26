@@ -5,17 +5,6 @@ import '../../theme/app_theme.dart';
 import '../../widgets/checklist_tile.dart';
 import 'checklist_widgets.dart';
 
-/// A single checklist item held in memory while the screen is open.
-class _Item {
-  final String section;
-  final String text;
-  int status;
-  String remark;
-  _Item({required this.section, required this.text})
-      : status = 0,
-        remark = '';
-}
-
 /// Shared base for Equipment, Pre-flight, In-flight, and Post-flight screens.
 ///
 /// [defs]              — list of (section, itemText) tuples
@@ -55,13 +44,13 @@ class BaseChecklistScreen extends StatefulWidget {
 class _BaseChecklistScreenState extends State<BaseChecklistScreen> {
   bool _isLoading = true;
   bool _isSaving = false;
-  late final List<_Item> _items;
+  late final List<ChecklistEntry> _items;
 
   @override
   void initState() {
     super.initState();
     _items = widget.defs
-        .map((d) => _Item(section: d.$1, text: d.$2))
+        .map((d) => ChecklistEntry(section: d.$1, text: d.$2))
         .toList();
     _loadExisting();
   }
