@@ -268,6 +268,8 @@ class SyncService {
         if (fp.missionObjectives.isNotEmpty)
           'mission_objectives': fp.missionObjectives,
         'contingency_plan': fp.contingencyPlan,
+        if (fp.coverageAreaGeoJson != null && fp.coverageAreaGeoJson!.isNotEmpty)
+          'coverage_area_geojson': fp.coverageAreaGeoJson,
         'organization_id': orgId,
       });
     }

@@ -11,6 +11,7 @@ class FlightPlan {
   String missionObjectives;
   String contingencyPlan;
   String createdAt;
+  String? coverageAreaGeoJson;
 
   FlightPlan({
     this.id,
@@ -25,6 +26,7 @@ class FlightPlan {
     required this.missionObjectives,
     required this.contingencyPlan,
     required this.createdAt,
+    this.coverageAreaGeoJson,
   });
 
   factory FlightPlan.fromMap(Map<String, dynamic> map) {
@@ -45,6 +47,7 @@ class FlightPlan {
       missionObjectives: map['mission_objectives'] ?? '',
       contingencyPlan: map['contingency_plan'] ?? '',
       createdAt: map['created_at'] ?? '',
+      coverageAreaGeoJson: map['coverage_area_geojson'] as String?,
     );
   }
 
@@ -62,6 +65,8 @@ class FlightPlan {
       'mission_objectives': missionObjectives,
       'contingency_plan': contingencyPlan,
       'created_at': createdAt,
+      if (coverageAreaGeoJson != null)
+        'coverage_area_geojson': coverageAreaGeoJson,
     };
   }
 }

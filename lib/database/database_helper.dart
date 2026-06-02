@@ -15,7 +15,7 @@ import '../services/org_settings_service.dart';
 
 class DatabaseHelper {
   static const _dbName = 'uas_fms.db';
-  static const _dbVersion = 10;
+  static const _dbVersion = 11;
 
   DatabaseHelper._();
   static final DatabaseHelper instance = DatabaseHelper._();
@@ -252,6 +252,10 @@ class DatabaseHelper {
             'ALTER TABLE missions DROP COLUMN has_approval_complete');
       } catch (_) {}
     }
+    if (oldVersion < 11) {
+      await db.execute(
+          'ALTER TABLE flight_plans ADD COLUMN coverage_area_geojson TEXT');
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -389,6 +393,7 @@ class DatabaseHelper {
         airspace_restrictions TEXT,
         mission_objectives TEXT,
         contingency_plan TEXT,
+        coverage_area_geojson TEXT,
         created_at TEXT NOT NULL
       )
     ''');

@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import '../../database/database_helper.dart';
 import '../../models/flight_plan.dart';
@@ -7,6 +9,7 @@ import '../../theme/app_theme.dart';
 import '../checklists/checklist_widgets.dart';
 import '../hira/hira_screen.dart';
 import '../shared/mission_flow_widgets.dart';
+import 'coverage_map_screen.dart';
 
 class FlightPlanningScreen extends StatefulWidget {
   final int missionId;
@@ -29,6 +32,8 @@ class _FlightPlanningScreenState extends State<FlightPlanningScreen> {
   final _contingencyCtrl = TextEditingController();
 
   String _airspaceClass = 'G (Uncontrolled)';
+  List<LatLng>? _coveragePoints;
+  LatLng? _missionCenter;
   bool _isLoading = true;
   bool _isSaving = false;
 
@@ -43,6 +48,12 @@ class _FlightPlanningScreenState extends State<FlightPlanningScreen> {
   }
 
   Future<void> _load() async {
+    final mission =
+        await DatabaseHelper.instance.getMissionById(widget.missionId);
+    if (mission?.latitude != null && mission?.longitude != null) {
+      _missionCenter = LatLng(mission!.latitude!, mission.longitude!);
+    }
+
     final existing = await DatabaseHelper.instance
         .getFlightPlanByMissionId(widget.missionId);
     if (existing != null && mounted) {
@@ -57,6 +68,7 @@ class _FlightPlanningScreenState extends State<FlightPlanningScreen> {
       _restrictionsCtrl.text = existing.airspaceRestrictions;
       _objectivesCtrl.text = existing.missionObjectives;
       _contingencyCtrl.text = existing.contingencyPlan;
+      _coveragePoints = _decodeGeoJson(existing.coverageAreaGeoJson);
     }
     if (mounted) setState(() => _isLoading = false);
   }
@@ -101,6 +113,7 @@ class _FlightPlanningScreenState extends State<FlightPlanningScreen> {
       missionObjectives: _objectivesCtrl.text.trim(),
       contingencyPlan: _contingencyCtrl.text.trim(),
       createdAt: DateTime.now().toIso8601String(),
+      coverageAreaGeoJson: _encodeGeoJson(_coveragePoints),
     );
 
     await DatabaseHelper.instance.saveFlightPlan(fp);
@@ -119,6 +132,93 @@ class _FlightPlanningScreenState extends State<FlightPlanningScreen> {
           missionId: widget.missionId, missionTitle: widget.missionTitle),
     ));
   }
+
+  // ── Coverage area helpers ───────────────────────────────────────────────────
+
+  static String? _encodeGeoJson(List<LatLng>? pts) {
+    if (pts == null || pts.length < 3) return null;
+    final ring = [
+      ...pts.map((p) => [p.longitude, p.latitude]),
+      [pts.first.longitude, pts.first.latitude],
+    ];
+    return jsonEncode({'type': 'Polygon', 'coordinates': [ring]});
+  }
+
+  static List<LatLng>? _decodeGeoJson(String? raw) {
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      final map = jsonDecode(raw) as Map<String, dynamic>;
+      final ring = (map['coordinates'] as List).first as List;
+      final pts = ring
+          .map((c) => LatLng(
+              (c[1] as num).toDouble(), (c[0] as num).toDouble()))
+          .toList();
+      // Remove closing point (GeoJSON rings duplicate the first vertex)
+      if (pts.length > 1 &&
+          pts.first.latitude == pts.last.latitude &&
+          pts.first.longitude == pts.last.longitude) {
+        pts.removeLast();
+      }
+      return pts.isEmpty ? null : pts;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _openMap() async {
+    final result = await Navigator.push<List<LatLng>>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CoverageMapScreen(
+          initialPoints: _coveragePoints,
+          initialCenter: _missionCenter ?? const LatLng(14.5, 121.0),
+        ),
+      ),
+    );
+    if (result != null) setState(() => _coveragePoints = result);
+  }
+
+  Widget _coverageAreaCard() {
+    final pts = _coveragePoints;
+    final ha = pts != null ? polygonAreaHa(pts) : 0.0;
+    final areaLabel = ha >= 100
+        ? '${(ha / 100).toStringAsFixed(2)} km²'
+        : '${ha.toStringAsFixed(2)} ha';
+    final hasPolygon = pts != null && pts.length >= 3;
+
+    return MissionFlowCard(
+      icon: Icons.satellite_alt_outlined,
+      title: 'Coverage Area (Optional)',
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        if (hasPolygon) ...[
+          Row(children: [
+            const Icon(Icons.check_circle_outline,
+                color: AppColors.success, size: 16),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '$areaLabel  ·  ${pts.length} vertices',
+                style: TextStyle(
+                    color: context.colors.textPrimary, fontSize: 13),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 10),
+        ],
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: _openMap,
+            icon: const Icon(Icons.draw_outlined, size: 16),
+            label:
+                Text(hasPolygon ? 'Edit Coverage Area' : 'Draw Coverage Area'),
+          ),
+        ),
+      ]),
+    );
+  }
+
+  // ── Build ───────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -148,6 +248,7 @@ class _FlightPlanningScreenState extends State<FlightPlanningScreen> {
                       'Describe the operational area, boundaries, and key landmarks...',
                       maxLines: 4),
                 ),
+                _coverageAreaCard(),
                 MissionFlowCard(
                   icon: Icons.cloud_outlined,
                   title: 'Weather Check',
