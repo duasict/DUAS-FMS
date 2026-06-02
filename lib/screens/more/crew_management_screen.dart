@@ -390,7 +390,8 @@ class _CrewManagementScreenState extends State<CrewManagementScreen> {
         final m = _members[i];
         final isMe = (m['id'] as String?) == myId;
         final role = m['role'] as String? ?? 'vo';
-        final licVerified = (m['license_verified'] as int? ?? 0) == 1;
+        final licVerified =
+            m['license_verified'] == true || m['license_verified'] == 1;
         final email = m['email'] as String? ?? '';
         final name = m['name'] as String? ?? email;
 
@@ -511,19 +512,23 @@ class _CrewManagementScreenState extends State<CrewManagementScreen> {
 
   String _roleLabel(String r) {
     switch (r) {
-      case 'crp':   return 'CRP — Safety Officer';
-      case 'rpic':  return 'RPIC — Pilot in Command';
-      case 'admin': return 'Admin';
-      default:      return 'VO — Visual Observer';
+      case 'crp':  return 'CRP — Safety Officer';
+      case 'pic':  return 'PIC — Pilot in Command';
+      case 'gcs':  return 'GCS — Ground Control Station';
+      case 'tech': return 'Tech — Maintenance Technician';
+      case 'vo':   return 'VO — Visual Observer';
+      default:     return r.toUpperCase();
     }
   }
 
   String _roleDesc(String r) {
     switch (r) {
-      case 'crp':   return 'Reviews missions, grants concurrence.';
-      case 'rpic':  return 'Can create and lead missions.';
-      case 'admin': return 'Full org management access.';
-      default:      return 'Standard crew member, assigned to missions.';
+      case 'crp':  return 'Reviews missions, grants concurrence.';
+      case 'pic':  return 'Can create and lead missions.';
+      case 'gcs':  return 'Operates the ground control station.';
+      case 'tech': return 'Handles maintenance and airworthiness checks.';
+      case 'vo':   return 'Visual observer, monitors the airspace.';
+      default:     return 'Standard crew member.';
     }
   }
 }
@@ -538,10 +543,11 @@ class _RoleBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final Color color;
     switch (role) {
-      case 'crp':   color = AppColors.danger;  break;
-      case 'rpic':  color = AppColors.primary; break;
-      case 'admin': color = AppColors.accent;  break;
-      default:      color = AppColors.success; break;
+      case 'crp':  color = AppColors.danger;   break;
+      case 'pic':  color = AppColors.primary;  break;
+      case 'gcs':  color = AppColors.accent;   break;
+      case 'tech': color = AppColors.warning;  break;
+      default:     color = AppColors.success;  break; // vo
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
