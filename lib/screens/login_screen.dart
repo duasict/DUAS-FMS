@@ -9,6 +9,7 @@ import '../providers/user_profile_provider.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import 'main_navigation.dart';
+import 'onboarding/org_setup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -347,7 +348,33 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
 
-              const SizedBox(height: 60),
+              const SizedBox(height: 24),
+
+              // Org setup link — for a CRP deploying the app for the first time
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Setting up a new organization?',
+                    style: TextStyle(
+                        color: context.colors.textMuted, fontSize: 13),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const OrgSetupScreen()),
+                    ),
+                    child: const Text(
+                      'Set it up first',
+                      style: TextStyle(
+                          color: AppColors.primaryLight, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 32),
 
               // Footer badge
               Center(

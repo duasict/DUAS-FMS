@@ -1607,7 +1607,7 @@ class PdfGeneratorService {
   /// Generates a one-page fleet summary PDF covering [missions] and basic stats.
   ///
   /// Parameters:
-  ///   [org]          – organisation settings (name, address, etc.)
+  ///   [org]          – organization settings (name, address, etc.)
   ///   [rangeLabel]   – human-readable date range, e.g. "Jan 2026 – May 2026"
   ///   [missions]     – all missions to summarise
   ///   [flightLogs]   – raw flight log maps from the database

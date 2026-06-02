@@ -39,7 +39,7 @@ class HelpDocumentationScreen extends StatelessWidget {
                     'VO (Visual Observer) — maintains situational awareness\n'
                     'GCS Operator — operates ground control station\n'
                     'Tech (Technical Crew Member) — equipment prep and maintenance\n\n'
-                    'Roles are assigned at the organisation level in your profile. '
+                    'Roles are assigned at the organization level in your profile. '
                     '"RPIC" is a mission-specific designation that maps to a verified PIC.',
               ),
             ],

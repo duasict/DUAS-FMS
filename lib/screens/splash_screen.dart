@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/org_settings_provider.dart';
-import '../services/org_settings_service.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import 'login_screen.dart';
 import 'main_navigation.dart';
-import 'onboarding/org_setup_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -43,11 +41,6 @@ class _SplashScreenState extends State<SplashScreen>
   Widget? _destination;
 
   Future<void> _checkAuth() async {
-    final isOrgConfigured = await OrgSettingsService.isConfigured();
-    if (!isOrgConfigured) {
-      _destination = const OrgSetupScreen();
-      return;
-    }
     final session = SupabaseService.currentSession;
     _destination =
         session != null ? const MainNavigation() : const LoginScreen();

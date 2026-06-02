@@ -5,7 +5,7 @@ import '../../services/org_settings_service.dart';
 import '../../theme/app_theme.dart';
 import '../login_screen.dart';
 
-/// First-run wizard (or Settings edit) for configuring the deploying organisation.
+/// First-run wizard (or Settings edit) for configuring the deploying organization.
 ///
 /// - [editMode] = false → shown on first launch; navigates to [LoginScreen] on save.
 /// - [editMode] = true  → opened from Settings by a CRP; pops on save.
@@ -90,7 +90,7 @@ class _OrgSetupScreenState extends State<OrgSetupScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: widget.editMode
-          ? AppBar(title: const Text('Organisation Settings'))
+          ? AppBar(title: const Text('Organization Settings'))
           : null,
       body: SafeArea(
         child: SingleChildScrollView(
@@ -119,7 +119,7 @@ class _OrgSetupScreenState extends State<OrgSetupScreen> {
                       child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Organisation Setup',
+                            Text('Organization Setup',
                                 style: TextStyle(
                                     color: context.colors.textPrimary,
                                     fontSize: 22,
@@ -141,7 +141,7 @@ class _OrgSetupScreenState extends State<OrgSetupScreen> {
 
                 _field(
                   controller: _orgNameCtrl,
-                  label: 'Organisation Name *',
+                  label: 'Organization Name *',
                   hint: 'e.g. Davao UAS Operations',
                   icon: Icons.business_outlined,
                   validator: (v) =>
@@ -217,7 +217,7 @@ class _OrgSetupScreenState extends State<OrgSetupScreen> {
                         ? 'Saving…'
                         : widget.editMode
                             ? 'Save Changes'
-                            : 'Set Up Organisation'),
+                            : 'Set Up Organization'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,

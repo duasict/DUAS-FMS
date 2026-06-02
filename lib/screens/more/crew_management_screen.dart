@@ -8,10 +8,10 @@ import '../../theme/app_theme.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 //  CrewManagementScreen  (CRP-only)
 //
-//  Lists every member in the current organisation, supports:
+//  Lists every member in the current organization, supports:
 //    • Changing a member's org-level role
 //    • Removing a member from the org
-//    • Copying the org join-code (organisation_id UUID)
+//    • Copying the org join-code (organization_id UUID)
 // ─────────────────────────────────────────────────────────────────────────────
 
 class CrewManagementScreen extends StatefulWidget {
@@ -175,7 +175,7 @@ class _CrewManagementScreenState extends State<CrewManagementScreen> {
         title: Text('Remove Member',
             style: TextStyle(color: ctx.colors.textPrimary)),
         content: Text(
-          'Remove $name from your organisation?\n\n'
+          'Remove $name from your organization?\n\n'
           'They will lose access to shared missions and records. '
           'Their account is not deleted.',
           style: TextStyle(color: ctx.colors.textSecondary),
@@ -204,7 +204,7 @@ class _CrewManagementScreenState extends State<CrewManagementScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('$name removed from organisation.'),
+          content: Text('$name removed from organization.'),
           backgroundColor: AppColors.success,
         ),
       );
@@ -305,7 +305,7 @@ class _CrewManagementScreenState extends State<CrewManagementScreen> {
               ]),
               const SizedBox(height: 6),
               Text(
-                'Share this code with pilots and VOs to let them join your organisation.',
+                'Share this code with pilots and VOs to let them join your organization.',
                 style: TextStyle(
                     color: context.colors.textMuted, fontSize: 11),
               ),
@@ -372,7 +372,7 @@ class _CrewManagementScreenState extends State<CrewManagementScreen> {
     if (_members.isEmpty) {
       return Center(
         child: Text(
-          'No members found in your organisation.',
+          'No members found in your organization.',
           style: TextStyle(
               color: context.colors.textSecondary, fontSize: 14),
         ),

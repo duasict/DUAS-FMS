@@ -39,12 +39,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _ThemeToggleTile(),
           if (isCrp) ...[
             const SizedBox(height: 20),
-            _sectionLabel(context, 'ORGANISATION'),
+            _sectionLabel(context, 'ORGANIZATION'),
             const SizedBox(height: 8),
             _navTile(
               context,
               icon: Icons.business_outlined,
-              title: 'Organisation Settings',
+              title: 'Organization Settings',
               subtitle: org.orgName,
               onTap: () => Navigator.push(
                 context,

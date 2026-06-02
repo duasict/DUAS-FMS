@@ -171,7 +171,7 @@ class AboutScreen extends StatelessWidget {
                   Text(
                     'This software is proprietary. Unauthorised distribution '
                     'or reproduction is prohibited. All flight data remains '
-                    'the property of the operating organisation.',
+                    'the property of the operating organization.',
                     style: TextStyle(
                         color: context.colors.textSecondary,
                         fontSize: 12,
