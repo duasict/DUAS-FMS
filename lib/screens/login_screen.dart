@@ -10,6 +10,7 @@ import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
 import 'main_navigation.dart';
 import 'onboarding/org_setup_screen.dart';
+import 'onboarding/sign_up_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -127,6 +128,27 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       await DatabaseHelper.instance.saveUserProfile(updated);
+
+      // First-login case: if the remote profile has no org or name yet (common
+      // when email confirmation was required at sign-up and the profile upsert
+      // was deferred), push the locally-saved sign-up data to Supabase now
+      // that we have an authenticated session.
+      final remoteOrgId = remote['organization_id'] as String? ?? '';
+      final remoteName  = remote['name']            as String? ?? '';
+      if ((remoteOrgId.isEmpty || remoteName.isEmpty) &&
+          (updated.organizationId.isNotEmpty || updated.name.isNotEmpty)) {
+        try {
+          await SupabaseService.upsertProfile({
+            'id': userId,
+            if (remoteOrgId.isEmpty && updated.organizationId.isNotEmpty)
+              'organization_id': updated.organizationId,
+            if (remoteName.isEmpty && updated.name.isNotEmpty)
+              'name': updated.name,
+          });
+        } catch (_) {
+          // Non-fatal
+        }
+      }
 
       if (mounted) {
         await context.read<UserProfileProvider>().load();
@@ -348,7 +370,33 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
+
+              // Sign-up link
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    "Don't have an account?",
+                    style: TextStyle(
+                        color: context.colors.textMuted, fontSize: 13),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const SignUpScreen()),
+                    ),
+                    child: const Text(
+                      'Sign up',
+                      style: TextStyle(
+                          color: AppColors.primaryLight, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 4),
 
               // Org setup link — for a CRP deploying the app for the first time
               Row(

@@ -26,6 +26,9 @@ class SupabaseService {
   static Future<AuthResponse> signIn(String email, String password) =>
       client.auth.signInWithPassword(email: email, password: password);
 
+  static Future<AuthResponse> signUp(String email, String password) =>
+      client.auth.signUp(email: email, password: password);
+
   static Future<void> signOut() => client.auth.signOut();
 
   static Future<void> sendPasswordReset(String email) =>
