@@ -1,6 +1,79 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_theme.dart';
 
+/// Shows a full-screen-blocking dialog prompting the user to confirm a
+/// timestamped event (take-off or landing).
+///
+/// Returns the current time as `'HH:MM'` if the user confirms, or `null` if
+/// they tap Skip.
+Future<String?> showTimeConfirmationDialog(
+  BuildContext context, {
+  required String title,
+  required String confirmLabel,
+  required IconData icon,
+  required Color color,
+}) async {
+  final now     = DateTime.now();
+  final timeStr = '${now.hour.toString().padLeft(2, '0')}:'
+      '${now.minute.toString().padLeft(2, '0')}';
+
+  final confirmed = await showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) => AlertDialog(
+      backgroundColor: ctx.colors.card,
+      title: Row(children: [
+        Icon(icon, color: color, size: 22),
+        const SizedBox(width: 10),
+        Text(title,
+            style: TextStyle(
+                color: ctx.colors.textPrimary,
+                fontSize: 16,
+                fontWeight: FontWeight.w700)),
+      ]),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        Text('Current time',
+            style: TextStyle(
+                color: ctx.colors.textSecondary, fontSize: 13)),
+        const SizedBox(height: 10),
+        Text(timeStr,
+            style: TextStyle(
+                color: color,
+                fontSize: 48,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 3,
+                fontFeatures: const [FontFeature.tabularFigures()])),
+        Text('UTC+8',
+            style: TextStyle(
+                color: ctx.colors.textMuted, fontSize: 11)),
+        const SizedBox(height: 14),
+        Text(
+          'This time will be recorded in the flight log.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+              color: ctx.colors.textSecondary, fontSize: 12, height: 1.4),
+        ),
+      ]),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: Text('Skip',
+              style: TextStyle(color: ctx.colors.textMuted)),
+        ),
+        ElevatedButton.icon(
+          onPressed: () => Navigator.pop(ctx, true),
+          icon: Icon(icon, size: 16),
+          label: Text(confirmLabel),
+          style: ElevatedButton.styleFrom(
+              backgroundColor: color, foregroundColor: Colors.white),
+        ),
+      ],
+    ),
+  );
+
+  return confirmed == true ? timeStr : null;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  ChecklistEntry
 //

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../database/database_helper.dart';
 import '../../providers/app_provider.dart';
+import '../../theme/app_theme.dart';
 import 'base_checklist_screen.dart';
+import 'checklist_widgets.dart';
 import 'inflight_checklist_screen.dart';
 
 class PreflightChecklistScreen extends StatelessWidget {
@@ -56,7 +58,7 @@ class PreflightChecklistScreen extends StatelessWidget {
       defs: _defs,
       checklistType: 'preflight',
       stepIndex: 0,
-      submitLabel: 'Submit & Proceed to In-flight Checklist',
+      submitLabel: 'Submit & Confirm Take-Off',
       onSubmitComplete: (ctx, id, title) async {
         final provider = ctx.read<AppProvider>();
         final mission = await DatabaseHelper.instance.getMissionById(id);
@@ -64,6 +66,24 @@ class PreflightChecklistScreen extends StatelessWidget {
           mission.hasPreflightComplete = true;
           await provider.updateMission(mission);
         }
+        if (!ctx.mounted) return;
+
+        final takeoffTime = await showTimeConfirmationDialog(
+          ctx,
+          title: 'Confirm Take-Off',
+          confirmLabel: 'Confirm Take-Off',
+          icon: Icons.flight_takeoff,
+          color: AppColors.success,
+        );
+
+        if (takeoffTime != null) {
+          final m = await DatabaseHelper.instance.getMissionById(id);
+          if (m != null) {
+            m.takeoffTime = takeoffTime;
+            await DatabaseHelper.instance.updateMission(m);
+          }
+        }
+
         if (!ctx.mounted) return;
         Navigator.of(ctx).push(MaterialPageRoute(
           builder: (_) =>

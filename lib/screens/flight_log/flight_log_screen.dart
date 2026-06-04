@@ -19,16 +19,13 @@ class FlightLogScreen extends StatefulWidget {
 class _FlightEntry {
   final TextEditingController takeoff = TextEditingController();
   final TextEditingController landing = TextEditingController();
-  final TextEditingController total = TextEditingController();
 
   void dispose() {
     takeoff.dispose();
     landing.dispose();
-    total.dispose();
   }
 
   int get totalMin {
-    if (total.text.isNotEmpty) return int.tryParse(total.text) ?? 0;
     try {
       final t = takeoff.text.split(':');
       final l = landing.text.split(':');
@@ -75,7 +72,7 @@ class _FlightLogScreenState extends State<FlightLogScreen> {
   final Set<String> _anomalies = {};
   bool _lidar = false;
 
-  final _flights = [_FlightEntry(), _FlightEntry(), _FlightEntry()];
+  final _flight = _FlightEntry();
 
   static const _payloadOptions = [
     'RGB (24MP)', 'RGB (61MP)', 'Multispectral', 'EO/IR', 'LiDAR', 'Cargo',
@@ -113,6 +110,9 @@ class _FlightLogScreenState extends State<FlightLogScreen> {
           if (r == 'vo') _voCtrl.text = c.name;
           if (r == 'tech') _techCtrl.text = c.name;
         }
+        // Pre-populate take-off / landing from checklist confirmation timestamps.
+        if (m.takeoffTime.isNotEmpty) _flight.takeoff.text = m.takeoffTime;
+        if (m.landingTime.isNotEmpty) _flight.landing.text = m.landingTime;
         _isLoading = false;
       });
     } else if (mounted) {
@@ -143,9 +143,7 @@ class _FlightLogScreenState extends State<FlightLogScreen> {
     for (final c in controllers) {
       c.dispose();
     }
-    for (final f in _flights) {
-      f.dispose();
-    }
+    _flight.dispose();
     super.dispose();
   }
 
@@ -154,21 +152,19 @@ class _FlightLogScreenState extends State<FlightLogScreen> {
     final provider = context.read<AppProvider>();
     final navigator = Navigator.of(context);
 
-    final flightList = _flights
-        .asMap()
-        .entries
-        .where((e) =>
-            e.value.takeoff.text.isNotEmpty ||
-            e.value.landing.text.isNotEmpty)
-        .map((e) => FlightDuration(
-              flightNum: '${e.key + 1}',
-              takeoff: e.value.takeoff.text,
-              landing: e.value.landing.text,
-              totalMin: e.value.totalMin,
-            ))
-        .toList();
+    final flightList = (_flight.takeoff.text.isNotEmpty ||
+            _flight.landing.text.isNotEmpty)
+        ? [
+            FlightDuration(
+              flightNum: '1',
+              takeoff: _flight.takeoff.text,
+              landing: _flight.landing.text,
+              totalMin: _flight.totalMin,
+            )
+          ]
+        : <FlightDuration>[];
 
-    final totalMin = flightList.fold(0, (s, f) => s + f.totalMin);
+    final totalMin = _flight.totalMin;
 
     final anomalyList = _anomalies.contains('Other') && _anomalyOtherCtrl.text.isNotEmpty
         ? ([..._anomalies.where((a) => a != 'Other'),
@@ -354,7 +350,7 @@ class _FlightLogScreenState extends State<FlightLogScreen> {
                   _field('Tech / Payload Operator', _techCtrl, readOnly: true),
                 ]),
                 _logSection('FLIGHT DURATION', Icons.timer_outlined, [
-                  ...List.generate(3, (i) => _flightRow(i)),
+                  _singleFlightRow(),
                 ]),
                 _logSection('WEATHER', Icons.cloud_outlined, [
                   Row(children: [
@@ -521,10 +517,11 @@ class _FlightLogScreenState extends State<FlightLogScreen> {
   }
 
   Widget _field(String label, TextEditingController ctrl,
-      {String? hint, bool readOnly = false}) {
+      {String? hint, bool readOnly = false, VoidCallback? onChanged}) {
     return TextField(
       controller: ctrl,
       readOnly: readOnly,
+      onChanged: onChanged != null ? (_) => onChanged() : null,
       style: TextStyle(color: context.colors.textPrimary, fontSize: 13),
       decoration: InputDecoration(
         labelText: label,
@@ -563,34 +560,60 @@ class _FlightLogScreenState extends State<FlightLogScreen> {
     );
   }
 
-  Widget _flightRow(int i) {
-    final e = _flights[i];
-    return Padding(
-      padding: EdgeInsets.only(bottom: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Flt ${i + 1}',
-            style: TextStyle(
-                color: context.colors.textSecondary,
-                fontSize: 11,
-                fontWeight: FontWeight.w600),
+  Widget _singleFlightRow() {
+    final mins = _flight.totalMin;
+    final h = mins ~/ 60;
+    final m = mins % 60;
+    final durationLabel = mins > 0
+        ? (h > 0 ? '$h h $m min' : '$m min')
+        : '—';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(children: [
+          Expanded(
+            child: _field('Take-off (HH:MM)', _flight.takeoff,
+                hint: '08:00',
+                onChanged: () => setState(() {})),
           ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Expanded(
-                  child: _field('Takeoff (HH:MM)', e.takeoff, hint: '08:00')),
-              const SizedBox(width: 8),
-              Expanded(
-                  child: _field('Landing (HH:MM)', e.landing, hint: '09:00')),
-              const SizedBox(width: 8),
-              Expanded(child: _field('Total (min)', e.total, hint: '60')),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _field('Landing (HH:MM)', _flight.landing,
+                hint: '09:30',
+                onChanged: () => setState(() {})),
+          ),
+        ]),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(8),
+            border:
+                Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+          ),
+          child: Row(children: [
+            const Icon(Icons.timer_outlined,
+                size: 14, color: AppColors.primary),
+            const SizedBox(width: 6),
+            Text('Total flight time: ',
+                style: TextStyle(
+                    color: context.colors.textSecondary, fontSize: 12)),
+            Text(durationLabel,
+                style: const TextStyle(
+                    color: AppColors.primaryLight,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700)),
+            if (mins > 0) ...[
+              const SizedBox(width: 6),
+              Text('($mins min)',
+                  style: TextStyle(
+                      color: context.colors.textMuted, fontSize: 11)),
             ],
-          ),
-        ],
-      ),
+          ]),
+        ),
+      ],
     );
   }
 }

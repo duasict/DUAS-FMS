@@ -185,6 +185,8 @@ class SyncService {
       'crp_advisory_notes': mission.crpAdvisoryNotes,
       'crp_concurrence_required': mission.crpConcurrenceRequired,
       'crp_concurrence_status': mission.crpConcurrenceStatus,
+      'takeoff_time': mission.takeoffTime,
+      'landing_time': mission.landingTime,
       'has_flight_plan_complete': mission.hasFlightPlanComplete,
       'has_hira_complete': mission.hasHiraComplete,
       'has_equipment_complete': mission.hasEquipmentComplete,

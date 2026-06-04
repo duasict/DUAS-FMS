@@ -36,6 +36,10 @@ class Mission {
   bool hasPostflightComplete;
   bool hasFlightlogComplete;
 
+  // Timestamps captured via the checklist confirmation dialogs
+  String takeoffTime; // '' | 'HH:MM'
+  String landingTime; // '' | 'HH:MM'
+
   bool isSynced;
   String createdAt;
   List<CrewMember> crew;
@@ -69,6 +73,8 @@ class Mission {
     this.hasInflightComplete = false,
     this.hasPostflightComplete = false,
     this.hasFlightlogComplete = false,
+    this.takeoffTime = '',
+    this.landingTime = '',
     this.isSynced = false,
     required this.createdAt,
     this.crew = const [],
@@ -108,6 +114,8 @@ class Mission {
       hasInflightComplete: (map['has_inflight_complete'] as int?) == 1,
       hasPostflightComplete: (map['has_postflight_complete'] as int?) == 1,
       hasFlightlogComplete: (map['has_flightlog_complete'] as int?) == 1,
+      takeoffTime: map['takeoff_time'] as String? ?? '',
+      landingTime: map['landing_time'] as String? ?? '',
       isSynced: (map['is_synced'] as int?) == 1,
       createdAt: map['created_at'] as String? ?? '',
     );
@@ -160,6 +168,8 @@ class Mission {
     bool? hasInflightComplete,
     bool? hasPostflightComplete,
     bool? hasFlightlogComplete,
+    String? takeoffTime,
+    String? landingTime,
     bool? isSynced,
     String? createdAt,
     List<CrewMember>? crew,
@@ -196,6 +206,8 @@ class Mission {
         hasPostflightComplete:
             hasPostflightComplete ?? this.hasPostflightComplete,
         hasFlightlogComplete: hasFlightlogComplete ?? this.hasFlightlogComplete,
+        takeoffTime: takeoffTime ?? this.takeoffTime,
+        landingTime: landingTime ?? this.landingTime,
         isSynced: isSynced ?? this.isSynced,
         createdAt: createdAt ?? this.createdAt,
         crew: crew ?? this.crew,
@@ -231,6 +243,8 @@ class Mission {
       'has_inflight_complete': hasInflightComplete ? 1 : 0,
       'has_postflight_complete': hasPostflightComplete ? 1 : 0,
       'has_flightlog_complete': hasFlightlogComplete ? 1 : 0,
+      'takeoff_time': takeoffTime,
+      'landing_time': landingTime,
       'is_synced': isSynced ? 1 : 0,
       'created_at': createdAt,
     };

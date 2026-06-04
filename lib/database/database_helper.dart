@@ -15,7 +15,7 @@ import '../services/org_settings_service.dart';
 
 class DatabaseHelper {
   static const _dbName = 'uas_fms.db';
-  static const _dbVersion = 11;
+  static const _dbVersion = 12;
 
   DatabaseHelper._();
   static final DatabaseHelper instance = DatabaseHelper._();
@@ -256,6 +256,12 @@ class DatabaseHelper {
       await db.execute(
           'ALTER TABLE flight_plans ADD COLUMN coverage_area_geojson TEXT');
     }
+    if (oldVersion < 12) {
+      await db.execute(
+          "ALTER TABLE missions ADD COLUMN takeoff_time TEXT NOT NULL DEFAULT ''");
+      await db.execute(
+          "ALTER TABLE missions ADD COLUMN landing_time TEXT NOT NULL DEFAULT ''");
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -289,6 +295,8 @@ class DatabaseHelper {
         has_inflight_complete INTEGER DEFAULT 0,
         has_postflight_complete INTEGER DEFAULT 0,
         has_flightlog_complete INTEGER DEFAULT 0,
+        takeoff_time TEXT NOT NULL DEFAULT '',
+        landing_time TEXT NOT NULL DEFAULT '',
         is_synced INTEGER DEFAULT 0,
         created_at TEXT NOT NULL
       )
