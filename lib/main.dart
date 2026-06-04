@@ -42,12 +42,13 @@ class FmsApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final themeMode = context.watch<ThemeProvider>().mode;
+    final themeMode    = context.watch<ThemeProvider>().mode;
+    final primaryColor = context.watch<OrgSettingsProvider>().primaryColor;
     return MaterialApp(
       title: 'FMS',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
+      theme:     AppTheme.lightTheme(primaryColor),
+      darkTheme: AppTheme.darkTheme(primaryColor),
       themeMode: themeMode,
       home: const SplashScreen(),
     );

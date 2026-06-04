@@ -10,6 +10,8 @@ class OrgSettings {
   final String slogan;
   /// Absolute path to the org logo image on device. Empty = use default icon.
   final String logoPath;
+  /// ARGB hex int for the primary brand colour, e.g. 0xFF333AFF (default blue).
+  final int primaryColorValue;
 
   const OrgSettings({
     required this.orgName,
@@ -18,6 +20,7 @@ class OrgSettings {
     required this.missionPrefix,
     required this.slogan,
     this.logoPath = '',
+    this.primaryColorValue = 0xFF333AFF,
   });
 
   static OrgSettings get defaults => const OrgSettings(
@@ -35,14 +38,16 @@ class OrgSettings {
     String? missionPrefix,
     String? slogan,
     String? logoPath,
+    int?    primaryColorValue,
   }) =>
       OrgSettings(
-        orgName:       orgName       ?? this.orgName,
-        appName:       appName       ?? this.appName,
-        tagline:       tagline       ?? this.tagline,
-        missionPrefix: missionPrefix ?? this.missionPrefix,
-        slogan:        slogan        ?? this.slogan,
-        logoPath:      logoPath      ?? this.logoPath,
+        orgName:           orgName           ?? this.orgName,
+        appName:           appName           ?? this.appName,
+        tagline:           tagline           ?? this.tagline,
+        missionPrefix:     missionPrefix     ?? this.missionPrefix,
+        slogan:            slogan            ?? this.slogan,
+        logoPath:          logoPath          ?? this.logoPath,
+        primaryColorValue: primaryColorValue ?? this.primaryColorValue,
       );
 }
 
@@ -53,8 +58,9 @@ class OrgSettingsService {
   static const _kTagline    = 'org.tagline';
   static const _kPrefix     = 'org.prefix';
   static const _kSlogan     = 'org.slogan';
-  static const _kLogoPath   = 'org.logoPath';
-  static const _kConfigured = 'org.configured';
+  static const _kLogoPath     = 'org.logoPath';
+  static const _kPrimaryColor = 'org.primaryColor';
+  static const _kConfigured   = 'org.configured';
 
   static Future<bool> isConfigured() async {
     final prefs = await SharedPreferences.getInstance();
@@ -70,7 +76,8 @@ class OrgSettingsService {
       tagline:       prefs.getString(_kTagline)   ?? d.tagline,
       missionPrefix: prefs.getString(_kPrefix)    ?? d.missionPrefix,
       slogan:        prefs.getString(_kSlogan)    ?? d.slogan,
-      logoPath:      prefs.getString(_kLogoPath)  ?? '',
+      logoPath:          prefs.getString(_kLogoPath)        ?? '',
+      primaryColorValue: prefs.getInt(_kPrimaryColor)       ?? 0xFF333AFF,
     );
   }
 
@@ -82,6 +89,7 @@ class OrgSettingsService {
     await prefs.setString(_kPrefix,     s.missionPrefix);
     await prefs.setString(_kSlogan,     s.slogan);
     await prefs.setString(_kLogoPath,   s.logoPath);
+    await prefs.setInt(_kPrimaryColor,  s.primaryColorValue);
     await prefs.setBool(_kConfigured,   true);
   }
 }
