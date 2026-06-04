@@ -8,6 +8,7 @@ import '../providers/org_settings_provider.dart';
 import '../providers/user_profile_provider.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/org_logo.dart';
 import 'main_navigation.dart';
 import 'onboarding/org_setup_screen.dart';
 import 'onboarding/sign_up_screen.dart';
@@ -220,16 +221,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
               // App logo & branding
               Row(children: [
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                        color: AppColors.primary.withValues(alpha: 0.35)),
-                  ),
-                  child: const Icon(Icons.air, color: AppColors.primary, size: 36),
-                ),
+                const OrgLogo(size: 64, circular: false),
                 const SizedBox(width: 16),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

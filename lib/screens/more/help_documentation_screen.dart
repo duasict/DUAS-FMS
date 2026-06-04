@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../providers/org_settings_provider.dart';
 import '../../theme/app_theme.dart';
 
 class HelpDocumentationScreen extends StatelessWidget {
@@ -6,6 +8,7 @@ class HelpDocumentationScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final appName = context.watch<OrgSettingsProvider>().appName;
     return Scaffold(
       appBar: AppBar(title: const Text('Help & Documentation')),
       body: ListView(
@@ -16,10 +19,10 @@ class HelpDocumentationScreen extends StatelessWidget {
           _Section(
             icon: Icons.rocket_launch_outlined,
             title: 'Getting Started',
-            children: const [
+            children: [
               _Entry(
-                q: 'What is DUAS FMS?',
-                a: 'DUAS FMS (Drone/UAS Fleet Management System) is an offline-first '
+                q: 'What is $appName?',
+                a: '$appName (Drone/UAS Fleet Management System) is an offline-first '
                     'mobile application for managing UAS flight operations in compliance '
                     'with CAAP SARP (Civil Aviation Authority of the Philippines '
                     'Standards and Recommended Practices) and ICAO Annex 2.',

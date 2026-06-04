@@ -1,8 +1,12 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import '../../providers/org_settings_provider.dart';
 import '../../services/org_settings_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/org_logo.dart';
 import '../login_screen.dart';
 
 /// First-run wizard (or Settings edit) for configuring the deploying organization.
@@ -24,7 +28,8 @@ class _OrgSetupScreenState extends State<OrgSetupScreen> {
   final _prefixCtrl    = TextEditingController();
   final _taglineCtrl   = TextEditingController();
   final _sloganCtrl    = TextEditingController();
-  bool  _isSaving      = false;
+  String _logoPath     = '';
+  bool   _isSaving     = false;
 
   @override
   void initState() {
@@ -35,11 +40,15 @@ class _OrgSetupScreenState extends State<OrgSetupScreen> {
   Future<void> _prefill() async {
     final s = await OrgSettingsService.load();
     final d = OrgSettings.defaults;
-    _orgNameCtrl.text = s.orgName   != d.orgName       ? s.orgName       : '';
-    _appNameCtrl.text = s.appName   != d.appName       ? s.appName       : '';
-    _prefixCtrl.text  = s.missionPrefix;
-    _taglineCtrl.text = s.tagline   != d.tagline       ? s.tagline       : '';
-    _sloganCtrl.text  = s.slogan    != d.slogan        ? s.slogan        : '';
+    if (!mounted) return;
+    setState(() {
+      _orgNameCtrl.text = s.orgName   != d.orgName   ? s.orgName   : '';
+      _appNameCtrl.text = s.appName   != d.appName   ? s.appName   : '';
+      _prefixCtrl.text  = s.missionPrefix;
+      _taglineCtrl.text = s.tagline   != d.tagline   ? s.tagline   : '';
+      _sloganCtrl.text  = s.slogan    != d.slogan    ? s.slogan    : '';
+      _logoPath         = s.logoPath;
+    });
   }
 
   @override
@@ -52,22 +61,36 @@ class _OrgSetupScreenState extends State<OrgSetupScreen> {
     super.dispose();
   }
 
+  Future<void> _pickLogo() async {
+    final picked = await ImagePicker()
+        .pickImage(source: ImageSource.gallery, maxWidth: 512, maxHeight: 512);
+    if (picked == null || !mounted) return;
+
+    // Copy to app documents directory so the path survives cache clears.
+    final dir  = await getApplicationDocumentsDirectory();
+    final dest = File('${dir.path}/org_logo.png');
+    await File(picked.path).copy(dest.path);
+
+    setState(() => _logoPath = dest.path);
+  }
+
   Future<void> _save() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _isSaving = true);
 
     final d = OrgSettings.defaults;
     final settings = OrgSettings(
-      orgName:       _orgNameCtrl.text.trim().isNotEmpty
+      orgName: _orgNameCtrl.text.trim().isNotEmpty
           ? _orgNameCtrl.text.trim() : d.orgName,
-      appName:       _appNameCtrl.text.trim().isNotEmpty
+      appName: _appNameCtrl.text.trim().isNotEmpty
           ? _appNameCtrl.text.trim() : d.appName,
       missionPrefix: _prefixCtrl.text.trim().toUpperCase().isNotEmpty
           ? _prefixCtrl.text.trim().toUpperCase() : d.missionPrefix,
-      tagline:       _taglineCtrl.text.trim().isNotEmpty
+      tagline: _taglineCtrl.text.trim().isNotEmpty
           ? _taglineCtrl.text.trim() : d.tagline,
-      slogan:        _sloganCtrl.text.trim().isNotEmpty
+      slogan: _sloganCtrl.text.trim().isNotEmpty
           ? _sloganCtrl.text.trim() : d.slogan,
+      logoPath: _logoPath,
     );
 
     if (!mounted) return;
@@ -101,7 +124,6 @@ class _OrgSetupScreenState extends State<OrgSetupScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (!widget.editMode) ...[
-                  // ── First-run header ─────────────────────────────────────
                   Row(children: [
                     Container(
                       padding: const EdgeInsets.all(14),
@@ -135,7 +157,7 @@ class _OrgSetupScreenState extends State<OrgSetupScreen> {
                   const SizedBox(height: 28),
                 ],
 
-                // ── Required ────────────────────────────────────────────────
+                // ── Required ───────────────────────────────────────────────
                 _sectionLabel(context, 'REQUIRED'),
                 const SizedBox(height: 10),
 
@@ -157,7 +179,8 @@ class _OrgSetupScreenState extends State<OrgSetupScreen> {
                   caps: true,
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) return 'Required';
-                    if (!RegExp(r'^[A-Z0-9\-]+$').hasMatch(v.trim().toUpperCase())) {
+                    if (!RegExp(r'^[A-Z0-9\-]+$')
+                        .hasMatch(v.trim().toUpperCase())) {
                       return 'Letters, numbers, and hyphens only';
                     }
                     return null;
@@ -166,21 +189,66 @@ class _OrgSetupScreenState extends State<OrgSetupScreen> {
 
                 const SizedBox(height: 20),
 
-                // ── Optional ────────────────────────────────────────────────
-                _sectionLabel(context, 'OPTIONAL'),
+                // ── Branding (optional) ────────────────────────────────────
+                _sectionLabel(context, 'BRANDING'),
                 const SizedBox(height: 4),
                 Text(
-                  'These customise how the app name appears on the login '
-                  'and splash screens.',
+                  'Customize the app name, logo, and splash screen to match '
+                  'your organization\'s identity.',
                   style: TextStyle(
                       color: context.colors.textMuted, fontSize: 11.5),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
 
+                // Logo picker tile
+                GestureDetector(
+                  onTap: _pickLogo,
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: context.colors.card,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: context.colors.border),
+                    ),
+                    child: Row(children: [
+                      OrgLogo(
+                          size: 56,
+                          circular: false,
+                          logoPathOverride:
+                              _logoPath.isNotEmpty ? _logoPath : null),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Organization Logo',
+                                style: TextStyle(
+                                    color: context.colors.textPrimary,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 3),
+                            Text(
+                              _logoPath.isNotEmpty
+                                  ? 'Tap to change logo'
+                                  : 'Tap to upload a logo from your gallery',
+                              style: TextStyle(
+                                  color: context.colors.textMuted,
+                                  fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.chevron_right,
+                          color: context.colors.textMuted, size: 20),
+                    ]),
+                  ),
+                ),
+
+                const SizedBox(height: 12),
                 _field(
                   controller: _appNameCtrl,
                   label: 'Short App Name',
-                  hint: 'e.g. DUAS  (max 6 chars)',
+                  hint: 'e.g. ACME  (max 6 chars, shown on splash)',
                   icon: Icons.label_outline,
                   maxLength: 6,
                 ),
@@ -278,8 +346,7 @@ class _OrgSetupScreenState extends State<OrgSetupScreen> {
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
-        prefixIcon:
-            Icon(icon, color: context.colors.textMuted, size: 18),
+        prefixIcon: Icon(icon, color: context.colors.textMuted, size: 18),
         counterText: '',
       ),
     );

@@ -8,6 +8,8 @@ class OrgSettings {
   final String tagline;
   final String missionPrefix;
   final String slogan;
+  /// Absolute path to the org logo image on device. Empty = use default icon.
+  final String logoPath;
 
   const OrgSettings({
     required this.orgName,
@@ -15,6 +17,7 @@ class OrgSettings {
     required this.tagline,
     required this.missionPrefix,
     required this.slogan,
+    this.logoPath = '',
   });
 
   static OrgSettings get defaults => const OrgSettings(
@@ -31,6 +34,7 @@ class OrgSettings {
     String? tagline,
     String? missionPrefix,
     String? slogan,
+    String? logoPath,
   }) =>
       OrgSettings(
         orgName:       orgName       ?? this.orgName,
@@ -38,6 +42,7 @@ class OrgSettings {
         tagline:       tagline       ?? this.tagline,
         missionPrefix: missionPrefix ?? this.missionPrefix,
         slogan:        slogan        ?? this.slogan,
+        logoPath:      logoPath      ?? this.logoPath,
       );
 }
 
@@ -48,6 +53,7 @@ class OrgSettingsService {
   static const _kTagline    = 'org.tagline';
   static const _kPrefix     = 'org.prefix';
   static const _kSlogan     = 'org.slogan';
+  static const _kLogoPath   = 'org.logoPath';
   static const _kConfigured = 'org.configured';
 
   static Future<bool> isConfigured() async {
@@ -64,6 +70,7 @@ class OrgSettingsService {
       tagline:       prefs.getString(_kTagline)   ?? d.tagline,
       missionPrefix: prefs.getString(_kPrefix)    ?? d.missionPrefix,
       slogan:        prefs.getString(_kSlogan)    ?? d.slogan,
+      logoPath:      prefs.getString(_kLogoPath)  ?? '',
     );
   }
 
@@ -74,6 +81,7 @@ class OrgSettingsService {
     await prefs.setString(_kTagline,    s.tagline);
     await prefs.setString(_kPrefix,     s.missionPrefix);
     await prefs.setString(_kSlogan,     s.slogan);
+    await prefs.setString(_kLogoPath,   s.logoPath);
     await prefs.setBool(_kConfigured,   true);
   }
 }

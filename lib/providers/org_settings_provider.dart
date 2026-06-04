@@ -17,6 +17,7 @@ class OrgSettingsProvider extends ChangeNotifier {
   String get tagline       => _settings.tagline;
   String get missionPrefix => _settings.missionPrefix;
   String get slogan        => _settings.slogan;
+  String get logoPath      => _settings.logoPath;
 
   Future<void> load() async {
     _configured = await OrgSettingsService.isConfigured();

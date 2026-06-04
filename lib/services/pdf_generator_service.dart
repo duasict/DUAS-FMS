@@ -192,21 +192,21 @@ class PdfGeneratorService {
 
   // ── Page footer ──────────────────────────────────────────────────────────
 
-  static pw.Widget _footer(pw.Context ctx) => pw.Padding(
-        padding: const pw.EdgeInsets.only(top: 6),
-        child: pw.Row(
-          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-          children: [
-            pw.Text('DUAS Fleet Management System',
-                style: pw.TextStyle(fontSize: 7, color: _txtMuted)),
-            pw.Text(
-                'Page ${ctx.pageNumber} of ${ctx.pagesCount}',
-                style: pw.TextStyle(fontSize: 7, color: _txtMuted)),
-            pw.Text('CAAP SARPs / ICAO Annex 2',
-                style: pw.TextStyle(fontSize: 7, color: _txtMuted)),
-          ],
-        ),
-      );
+  static pw.BuildCallback _footerFor(OrgSettings org) =>
+      (pw.Context ctx) => pw.Padding(
+            padding: const pw.EdgeInsets.only(top: 6),
+            child: pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('${org.appName} Fleet Management System',
+                    style: pw.TextStyle(fontSize: 7, color: _txtMuted)),
+                pw.Text('Page ${ctx.pageNumber} of ${ctx.pagesCount}',
+                    style: pw.TextStyle(fontSize: 7, color: _txtMuted)),
+                pw.Text('CAAP SARPs / ICAO Annex 2',
+                    style: pw.TextStyle(fontSize: 7, color: _txtMuted)),
+              ],
+            ),
+          );
 
   // ── Status badge (for checklist tables) ─────────────────────────────────
 
@@ -438,7 +438,7 @@ class PdfGeneratorService {
     doc.addPage(pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(30),
-      footer: _footer,
+      footer: _footerFor(org),
       build: (ctx) => [
         _pageHeader(org, 'ANNEX A-1', 'FLIGHT PLAN RECORD'),
 
@@ -558,7 +558,7 @@ class PdfGeneratorService {
     doc.addPage(pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(30),
-      footer: _footer,
+      footer: _footerFor(org),
       build: (ctx) => [
         _pageHeader(org, 'ANNEX A-2',
             'HAZARD IDENTIFICATION & RISK ASSESSMENT (HIRA)'),
@@ -745,7 +745,7 @@ class PdfGeneratorService {
     doc.addPage(pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(30),
-      footer: _footer,
+      footer: _footerFor(org),
       build: (ctx) => [
         _pageHeader(
             org, 'ANNEX A-3', 'EQUIPMENT HANDLING CHECKLIST'),
@@ -775,7 +775,7 @@ class PdfGeneratorService {
     doc.addPage(pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(30),
-      footer: _footer,
+      footer: _footerFor(org),
       build: (ctx) => [
         _pageHeader(org, 'ANNEX A-4', 'FIT-TO-FLY DECLARATION'),
         _section('Mission Information'),
@@ -886,7 +886,7 @@ class PdfGeneratorService {
     doc.addPage(pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(30),
-      footer: _footer,
+      footer: _footerFor(org),
       build: (ctx) => [
         _pageHeader(org, 'ANNEX A-5', 'PRE-FLIGHT CHECKLIST'),
         _section('Mission Information'),
@@ -920,7 +920,7 @@ class PdfGeneratorService {
     doc.addPage(pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(30),
-      footer: _footer,
+      footer: _footerFor(org),
       build: (ctx) => [
         _pageHeader(org, 'ANNEX A-6', 'IN-FLIGHT CHECKLIST'),
         _section('Mission Information'),
@@ -958,7 +958,7 @@ class PdfGeneratorService {
     doc.addPage(pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(30),
-      footer: _footer,
+      footer: _footerFor(org),
       build: (ctx) => [
         _pageHeader(org, 'ANNEX A-7', 'POST-FLIGHT CHECKLIST'),
         _section('Mission Information'),
@@ -996,7 +996,7 @@ class PdfGeneratorService {
     doc.addPage(pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(30),
-      footer: _footer,
+      footer: _footerFor(org),
       build: (ctx) => [
         _pageHeader(org, 'ANNEX A-8', 'FLIGHT LOG'),
         if (log == null) ...[
@@ -1218,7 +1218,7 @@ class PdfGeneratorService {
     doc.addPage(pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(30),
-      footer: _footer,
+      footer: _footerFor(org),
       build: (ctx) => [
         _pageHeader(org, 'ANNEX A-9', 'MAINTENANCE LOG'),
         _section('Aircraft Information'),
@@ -1364,7 +1364,7 @@ class PdfGeneratorService {
     doc.addPage(pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(30),
-      footer: _footer,
+      footer: _footerFor(org),
       build: (ctx) => [
         _pageHeader(org, 'ANNEX A-10', 'BATTERY LOG'),
         _section('Battery Information'),
@@ -1538,7 +1538,7 @@ class PdfGeneratorService {
     doc.addPage(pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(30),
-      footer: _footer,
+      footer: _footerFor(org),
       build: (ctx) => [
         _pageHeader(
             org, 'ANNEX A-11', 'INCIDENT / OCCURRENCE REPORT'),
@@ -1709,7 +1709,7 @@ class PdfGeneratorService {
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(36),
         header: (ctx) => _pageHeader(org, 'FLEET-SUM', 'Fleet Summary Report'),
-        footer: _footer,
+        footer: _footerFor(org),
         build: (ctx) => [
           // Report meta
           pw.Container(

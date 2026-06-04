@@ -642,8 +642,8 @@ class _MissionReportsScreenState
         const SizedBox(width: 10),
         Expanded(
           child: Text(
-            'PDFs follow the DUAS Operations Manual Annex A format '
-            '(Rev. 2.0). Forms are populated from the data entered '
+            'PDFs follow the ${_org.orgName} Operations Manual Annex A '
+            'format (Rev. 2.0). Forms are populated from the data entered '
             'during each mission step. Completed forms can be shared '
             'directly to cloud storage, email, or printed.',
             style: TextStyle(

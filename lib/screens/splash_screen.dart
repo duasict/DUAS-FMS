@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/org_settings_provider.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/org_logo.dart';
 import 'login_screen.dart';
 import 'main_navigation.dart';
 
@@ -79,19 +80,7 @@ class _SplashScreenState extends State<SplashScreen>
               mainAxisSize: MainAxisSize.min,
               children: [
                 // Logo mark
-                Container(
-                  width: 88,
-                  height: 88,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.12),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: AppColors.primary.withValues(alpha: 0.35),
-                      width: 1.5,
-                    ),
-                  ),
-                  child: const Icon(Icons.air, color: AppColors.primary, size: 44),
-                ),
+                const OrgLogo(size: 88, circular: true),
                 const SizedBox(height: 28),
                 Text(
                   org.appName,

@@ -1,14 +1,38 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:provider/provider.dart';
+import '../../providers/org_settings_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/org_logo.dart';
 
-class AboutScreen extends StatelessWidget {
+class AboutScreen extends StatefulWidget {
   const AboutScreen({super.key});
 
-  static const _version     = '1.0.0';
-  static const _buildNumber = '1';
+  @override
+  State<AboutScreen> createState() => _AboutScreenState();
+}
+
+class _AboutScreenState extends State<AboutScreen> {
+  String _version     = '';
+  String _buildNumber = '';
+
+  @override
+  void initState() {
+    super.initState();
+    PackageInfo.fromPlatform().then((i) {
+      if (mounted) {
+        setState(() {
+          _version     = i.version;
+          _buildNumber = i.buildNumber;
+        });
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    final org = context.watch<OrgSettingsProvider>();
+
     return Scaffold(
       appBar: AppBar(title: const Text('About')),
       body: ListView(
@@ -17,33 +41,10 @@ class AboutScreen extends StatelessWidget {
           // ── Logo block ──────────────────────────────────────────────────
           Center(
             child: Column(children: [
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: [
-                      AppColors.primary,
-                      AppColors.primaryLight,
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.35),
-                      blurRadius: 18,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
-                ),
-                child: const Icon(Icons.flight_takeoff,
-                    color: Colors.white, size: 38),
-              ),
+              OrgLogo(size: 80, circular: false),
               const SizedBox(height: 16),
               Text(
-                'DUAS FMS',
+                org.appName,
                 style: TextStyle(
                     color: context.colors.textPrimary,
                     fontSize: 22,
@@ -52,28 +53,29 @@ class AboutScreen extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                'UAS Fleet Management System',
+                org.tagline,
                 style: TextStyle(
                     color: context.colors.textSecondary, fontSize: 13),
               ),
               const SizedBox(height: 8),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                      color: AppColors.primary.withValues(alpha: 0.25)),
+              if (_version.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.25)),
+                  ),
+                  child: Text(
+                    'v$_version (build $_buildNumber)',
+                    style: const TextStyle(
+                        color: AppColors.primaryLight,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600),
+                  ),
                 ),
-                child: Text(
-                  'v$_version (build $_buildNumber)',
-                  style: const TextStyle(
-                      color: AppColors.primaryLight,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600),
-                ),
-              ),
             ]),
           ),
 
@@ -132,10 +134,10 @@ class AboutScreen extends StatelessWidget {
               border: Border.all(color: context.colors.border),
             ),
             child: Text(
-              'DUAS FMS is intended for use by certified UAS operators and '
-              'their crews operating under CAAP-regulated airspace in the '
-              'Philippines. The application assists with pre-flight planning, '
-              'risk assessment, crew management, and post-flight documentation '
+              '${org.appName} is intended for use by certified UAS operators '
+              'and their crews operating under CAAP-regulated airspace. '
+              'The application assists with pre-flight planning, risk '
+              'assessment, crew management, and post-flight documentation '
               'but does not replace the operator\'s responsibility to comply '
               'with all applicable aviation regulations.',
               style: TextStyle(
@@ -161,7 +163,8 @@ class AboutScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '© 2025 DUAS Operations. All rights reserved.',
+                    '© ${DateTime.now().year} ${org.orgName}. '
+                    'All rights reserved.',
                     style: TextStyle(
                         color: context.colors.textPrimary,
                         fontSize: 13,
@@ -169,7 +172,7 @@ class AboutScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'This software is proprietary. Unauthorised distribution '
+                    'This software is proprietary. Unauthorized distribution '
                     'or reproduction is prohibited. All flight data remains '
                     'the property of the operating organization.',
                     style: TextStyle(
@@ -185,7 +188,8 @@ class AboutScreen extends StatelessWidget {
           // ── Build metadata ──────────────────────────────────────────────
           Center(
             child: Text(
-              'DUAS FMS v$_version · Build $_buildNumber\n'
+              '${org.appName}'
+              '${_version.isNotEmpty ? ' v$_version · Build $_buildNumber' : ''}\n'
               'CAAP SARPs · ICAO Annex 2',
               textAlign: TextAlign.center,
               style: TextStyle(

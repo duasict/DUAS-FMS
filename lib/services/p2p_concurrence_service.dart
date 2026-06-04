@@ -6,6 +6,7 @@ import 'package:shelf/shelf_io.dart' as io;
 import 'package:shelf_router/shelf_router.dart';
 import '../database/database_helper.dart';
 import 'notification_service.dart';
+import 'org_settings_service.dart';
 
 class P2pConcurrenceService {
   static HttpServer? _server;
@@ -72,9 +73,10 @@ class P2pConcurrenceService {
 
   static bool get isRunning => _server != null;
 
-  static Response _handleRoot(Request req) {
+  static Future<Response> _handleRoot(Request req) async {
+    final org = await OrgSettingsService.load();
     return Response.ok(
-      _html('DUAS FMS P2P',
+      _html('${org.appName} P2P',
           '<p>Routes:<br>'
           '&bull; <a href="/missions">GET /missions</a> — JSON list of all missions<br>'
           '&bull; <a href="/concurrence">GET /concurrence</a> — review active mission</p>'),
@@ -229,5 +231,5 @@ class P2pConcurrenceService {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>$title</title>
 <style>body{font-family:sans-serif;padding:20px;max-width:600px;margin:auto}</style>
-</head><body><h1>DUAS FMS</h1>$body</body></html>''';
+</head><body><h1>$title</h1>$body</body></html>''';
 }
