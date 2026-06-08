@@ -50,17 +50,6 @@ class AppColors {
   static const Color info         = Color(0xFF4B6CA2);
   static const Color infoDark     = Color(0xFF21498A);
 
-  // ── Predefined primary colour swatches (OEM whitelabel) ───────────────────
-  static const List<({String label, Color color})> primarySwatches = [
-    (label: 'Blue',    color: Color(0xFF333AFF)),
-    (label: 'Indigo',  color: Color(0xFF4338CA)),
-    (label: 'Violet',  color: Color(0xFF7C3AED)),
-    (label: 'Rose',    color: Color(0xFFE11D48)),
-    (label: 'Red',     color: Color(0xFFDC2626)),
-    (label: 'Orange',  color: Color(0xFFEA580C)),
-    (label: 'Teal',    color: Color(0xFF0F766E)),
-    (label: 'Green',   color: Color(0xFF16A34A)),
-  ];
 }
 
 // ── Structural + brand colors — available via context.colors ──────────────────

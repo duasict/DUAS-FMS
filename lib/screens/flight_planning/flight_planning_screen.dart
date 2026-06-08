@@ -171,7 +171,7 @@ class _FlightPlanningScreenState extends State<FlightPlanningScreen> {
       MaterialPageRoute(
         builder: (_) => CoverageMapScreen(
           initialPoints: _coveragePoints,
-          initialCenter: _missionCenter ?? const LatLng(14.5, 121.0),
+          initialCenter: _missionCenter,
         ),
       ),
     );

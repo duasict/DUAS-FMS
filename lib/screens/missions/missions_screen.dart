@@ -55,7 +55,7 @@ class _MissionsScreenState extends State<MissionsScreen>
       appBar: AppBar(
         title: const Text('Missions'),
         bottom: PreferredSize(
-          preferredSize: Size.fromHeight(isUpcomingTab ? 116 : 88),
+          preferredSize: Size.fromHeight(isUpcomingTab ? 138 : 88),
           child: Column(children: [
             // ── Search bar ────────────────────────────────────────────
             Padding(
@@ -105,8 +105,11 @@ class _MissionsScreenState extends State<MissionsScreen>
             TabBar(
               controller: _tabCtrl,
               indicatorColor: AppColors.primary,
+              indicatorWeight: 2.5,
+              indicatorSize: TabBarIndicatorSize.label,
               labelColor: AppColors.primaryLight,
               unselectedLabelColor: context.colors.textMuted,
+              dividerColor: context.colors.border,
               tabs: const [
                 Tab(text: 'Upcoming'),
                 Tab(text: 'Completed'),
@@ -114,11 +117,14 @@ class _MissionsScreenState extends State<MissionsScreen>
             ),
             // ── Status filter chips (Upcoming tab only) ───────────────
             if (isUpcomingTab)
-              SizedBox(
-                height: 36,
+              Container(
+                color: context.colors.background,
+                padding: const EdgeInsets.fromLTRB(0, 10, 0, 8),
+                child: SizedBox(
+                height: 32,
                 child: ListView(
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.fromLTRB(14, 4, 14, 0),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
                   children: [
                     _FilterChip(
                       label: 'All',
@@ -130,7 +136,6 @@ class _MissionsScreenState extends State<MissionsScreen>
                       label: 'Planning',
                       selected: _statusFilter == 'planning',
                       onTap: () => setState(() => _statusFilter = 'planning'),
-                      color: AppColors.primary,
                     ),
                     const SizedBox(width: 8),
                     _FilterChip(
@@ -138,11 +143,11 @@ class _MissionsScreenState extends State<MissionsScreen>
                       selected: _statusFilter == 'in_progress',
                       onTap: () =>
                           setState(() => _statusFilter = 'in_progress'),
-                      color: AppColors.accent,
                     ),
                   ],
                 ),
               ),
+            ),
           ]),
         ),
       ),
@@ -187,13 +192,11 @@ class _FilterChip extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
-  final Color color;
 
   const _FilterChip({
     required this.label,
     required this.selected,
     required this.onTap,
-    this.color = AppColors.primaryLight,
   });
 
   @override
@@ -205,18 +208,18 @@ class _FilterChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
         decoration: BoxDecoration(
           color: selected
-              ? color.withValues(alpha: 0.18)
-              : context.colors.surface,
+              ? AppColors.primary.withValues(alpha: 0.18)
+              : context.colors.card,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: selected ? color : context.colors.border,
+            color: selected ? AppColors.primary : context.colors.border,
             width: selected ? 1.4 : 1.0,
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: selected ? color : context.colors.textMuted,
+            color: selected ? AppColors.primaryLight : context.colors.textMuted,
             fontSize: 12,
             fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
           ),

@@ -1131,25 +1131,39 @@ class PdfGeneratorService {
     final header = pw.Container(
       decoration: pw.BoxDecoration(color: _navy),
       child: pw.Row(children: [
-        pw.SizedBox(width: 65, child: _th('FLIGHT #')),
-        pw.SizedBox(width: 85, child: _th('TAKEOFF', center: true)),
-        pw.SizedBox(width: 85, child: _th('LANDING', center: true)),
-        pw.Expanded(child: _th('DURATION', center: true)),
+        pw.SizedBox(width: 60, child: _th('FLIGHT #')),
+        pw.SizedBox(width: 75, child: _th('TAKEOFF', center: true)),
+        pw.SizedBox(width: 75, child: _th('LANDING', center: true)),
+        pw.SizedBox(width: 60, child: _th('DURATION', center: true)),
+        pw.Expanded(child: _th('COORDINATES (takeoff / landing)', center: true)),
       ]),
     );
 
     final rows = flights.asMap().entries.map((e) {
       final i = e.key;
       final f = e.value;
+
+      String coordText = '';
+      if (f.takeoffLat != null && f.takeoffLon != null) {
+        coordText +=
+            'T/O: ${f.takeoffLat!.toStringAsFixed(5)}°, ${f.takeoffLon!.toStringAsFixed(5)}°';
+      }
+      if (f.landingLat != null && f.landingLon != null) {
+        if (coordText.isNotEmpty) coordText += '\n';
+        coordText +=
+            'LDG: ${f.landingLat!.toStringAsFixed(5)}°, ${f.landingLon!.toStringAsFixed(5)}°';
+      }
+      if (coordText.isEmpty) coordText = '—';
+
       return pw.Container(
         decoration: pw.BoxDecoration(
           color: i.isEven ? PdfColors.white : _rowAlt,
           border: pw.Border(
               bottom: pw.BorderSide(color: _border, width: 0.5)),
         ),
-        child: pw.Row(children: [
+        child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.center, children: [
           pw.SizedBox(
-            width: 65,
+            width: 60,
             child: pw.Padding(
               padding: const pw.EdgeInsets.symmetric(
                   horizontal: 8, vertical: 6),
@@ -1159,28 +1173,41 @@ class PdfGeneratorService {
             ),
           ),
           pw.SizedBox(
-            width: 85,
+            width: 75,
             child: pw.Center(
-              child: pw.Text(f.takeoff,
+              child: pw.Text(f.takeoff.isNotEmpty ? f.takeoff : '—',
                   style:
                       pw.TextStyle(fontSize: 9, color: _txtDark)),
             ),
           ),
           pw.SizedBox(
-            width: 85,
+            width: 75,
             child: pw.Center(
-              child: pw.Text(f.landing,
+              child: pw.Text(f.landing.isNotEmpty ? f.landing : '—',
                   style:
                       pw.TextStyle(fontSize: 9, color: _txtDark)),
             ),
           ),
-          pw.Expanded(
+          pw.SizedBox(
+            width: 60,
             child: pw.Center(
               child: pw.Text('${f.totalMin} min',
                   style: pw.TextStyle(
                       fontSize: 9,
                       fontWeight: pw.FontWeight.bold,
                       color: _txtDark)),
+            ),
+          ),
+          pw.Expanded(
+            child: pw.Padding(
+              padding: const pw.EdgeInsets.symmetric(
+                  horizontal: 8, vertical: 5),
+              child: pw.Text(
+                coordText,
+                style: pw.TextStyle(
+                    fontSize: 8, color: _txtMuted,
+                    lineSpacing: 2),
+              ),
             ),
           ),
         ]),

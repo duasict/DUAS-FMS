@@ -163,55 +163,56 @@ class _LicenseVerificationScreenState
   }
 
   Widget _stepIndicator() {
-    final labels = ['Intro', 'Scan ID', 'Face Check', 'Confirm'];
+    const count = 4; // Intro · Scan ID · Face Check · Confirm
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
       child: Row(
-        children: List.generate(labels.length, (i) {
-          final active = i == _step;
-          final done = i < _step;
-          return Expanded(
-            child: Row(children: [
-              Container(
-                width: 20,
-                height: 20,
-                decoration: BoxDecoration(
-                  color: done
-                      ? AppColors.success
-                      : active
-                          ? AppColors.primary
-                          : context.colors.surface,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: done
-                        ? AppColors.success
-                        : active
-                            ? AppColors.primary
-                            : context.colors.border,
-                  ),
-                ),
-                child: Center(
-                  child: done
-                      ? const Icon(Icons.check, size: 11, color: Colors.white)
-                      : Text('${i + 1}',
-                          style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: active
-                                  ? Colors.white
-                                  : context.colors.textMuted)),
-                ),
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: List.generate(count * 2 - 1, (i) {
+          if (i.isOdd) {
+            // Connector line — green when the step to the left is done
+            return Expanded(
+              child: Container(
+                height: 1,
+                color: (i ~/ 2) < _step
+                    ? AppColors.success
+                    : context.colors.border,
               ),
-              if (i < labels.length - 1)
-                Expanded(
-                  child: Container(
-                    height: 1,
-                    color: i < _step
-                        ? AppColors.success
+            );
+          }
+          final idx    = i ~/ 2;
+          final active = idx == _step;
+          final done   = idx < _step;
+          return Container(
+            width: 20,
+            height: 20,
+            decoration: BoxDecoration(
+              color: done
+                  ? AppColors.success
+                  : active
+                      ? AppColors.primary
+                      : context.colors.surface,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: done
+                    ? AppColors.success
+                    : active
+                        ? AppColors.primary
                         : context.colors.border,
-                  ),
-                ),
-            ]),
+              ),
+            ),
+            child: Center(
+              child: done
+                  ? const Icon(Icons.check, size: 11, color: Colors.white)
+                  : Text(
+                      '${idx + 1}',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: active ? Colors.white : context.colors.textMuted,
+                      ),
+                    ),
+            ),
           );
         }),
       ),

@@ -5,12 +5,20 @@ class FlightDuration {
   String takeoff;
   String landing;
   int totalMin;
+  double? takeoffLat;
+  double? takeoffLon;
+  double? landingLat;
+  double? landingLon;
 
   FlightDuration({
     required this.flightNum,
     required this.takeoff,
     required this.landing,
     required this.totalMin,
+    this.takeoffLat,
+    this.takeoffLon,
+    this.landingLat,
+    this.landingLon,
   });
 
   factory FlightDuration.fromMap(Map<String, dynamic> map) {
@@ -19,6 +27,18 @@ class FlightDuration {
       takeoff: map['takeoff'] ?? '',
       landing: map['landing'] ?? '',
       totalMin: map['totalMin'] ?? 0,
+      takeoffLat: map['takeoffLat'] != null
+          ? (map['takeoffLat'] as num).toDouble()
+          : null,
+      takeoffLon: map['takeoffLon'] != null
+          ? (map['takeoffLon'] as num).toDouble()
+          : null,
+      landingLat: map['landingLat'] != null
+          ? (map['landingLat'] as num).toDouble()
+          : null,
+      landingLon: map['landingLon'] != null
+          ? (map['landingLon'] as num).toDouble()
+          : null,
     );
   }
 
@@ -28,6 +48,10 @@ class FlightDuration {
       'takeoff': takeoff,
       'landing': landing,
       'totalMin': totalMin,
+      if (takeoffLat != null) 'takeoffLat': takeoffLat,
+      if (takeoffLon != null) 'takeoffLon': takeoffLon,
+      if (landingLat != null) 'landingLat': landingLat,
+      if (landingLon != null) 'landingLon': landingLon,
     };
   }
 }

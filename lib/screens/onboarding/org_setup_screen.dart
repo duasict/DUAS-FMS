@@ -28,9 +28,8 @@ class _OrgSetupScreenState extends State<OrgSetupScreen> {
   final _prefixCtrl    = TextEditingController();
   final _taglineCtrl   = TextEditingController();
   final _sloganCtrl    = TextEditingController();
-  String _logoPath          = '';
-  int    _primaryColorValue = 0xFF333AFF;
-  bool   _isSaving          = false;
+  String _logoPath  = '';
+  bool   _isSaving  = false;
 
   @override
   void initState() {
@@ -48,8 +47,7 @@ class _OrgSetupScreenState extends State<OrgSetupScreen> {
       _prefixCtrl.text  = s.missionPrefix;
       _taglineCtrl.text = s.tagline   != d.tagline   ? s.tagline   : '';
       _sloganCtrl.text  = s.slogan    != d.slogan    ? s.slogan    : '';
-      _logoPath          = s.logoPath;
-      _primaryColorValue = s.primaryColorValue;
+      _logoPath = s.logoPath;
     });
   }
 
@@ -92,8 +90,7 @@ class _OrgSetupScreenState extends State<OrgSetupScreen> {
           ? _taglineCtrl.text.trim() : d.tagline,
       slogan: _sloganCtrl.text.trim().isNotEmpty
           ? _sloganCtrl.text.trim() : d.slogan,
-      logoPath:          _logoPath,
-      primaryColorValue: _primaryColorValue,
+      logoPath: _logoPath,
     );
 
     if (!mounted) return;
@@ -244,72 +241,6 @@ class _OrgSetupScreenState extends State<OrgSetupScreen> {
                       Icon(Icons.chevron_right,
                           color: context.colors.textMuted, size: 20),
                     ]),
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-
-                // ── Primary colour picker ──────────────────────────────────
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: context.colors.card,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: context.colors.border),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(children: [
-                        Icon(Icons.palette_outlined,
-                            size: 16, color: context.colors.textMuted),
-                        const SizedBox(width: 8),
-                        Text('Primary Color',
-                            style: TextStyle(
-                                color: context.colors.textPrimary,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600)),
-                      ]),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: AppColors.primarySwatches.map((s) {
-                          final selected = s.color.toARGB32() == _primaryColorValue;
-                          return GestureDetector(
-                            onTap: () => setState(
-                                () => _primaryColorValue = s.color.toARGB32()),
-                            child: Tooltip(
-                              message: s.label,
-                              child: Container(
-                                width: 40,
-                                height: 40,
-                                decoration: BoxDecoration(
-                                  color: s.color,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: selected
-                                        ? context.colors.textPrimary
-                                        : Colors.transparent,
-                                    width: 2.5,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: s.color.withValues(alpha: 0.4),
-                                      blurRadius: selected ? 8 : 0,
-                                    ),
-                                  ],
-                                ),
-                                child: selected
-                                    ? const Icon(Icons.check,
-                                        color: Colors.white, size: 18)
-                                    : null,
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ],
                   ),
                 ),
 

@@ -278,6 +278,21 @@ CREATE TABLE IF NOT EXISTS public.flight_logs (
   created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- ─── Mission Flight Legs ──────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.mission_flights (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  mission_id      UUID NOT NULL REFERENCES public.missions(id) ON DELETE CASCADE,
+  flight_num      INTEGER NOT NULL,
+  takeoff_time    TEXT NOT NULL DEFAULT '',
+  landing_time    TEXT NOT NULL DEFAULT '',
+  takeoff_lat     DOUBLE PRECISION,
+  takeoff_lon     DOUBLE PRECISION,
+  landing_lat     DOUBLE PRECISION,
+  landing_lon     DOUBLE PRECISION,
+  organization_id UUID REFERENCES public.organizations(id),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- ════════════════════════════════════════════════════════════════════════════
 -- MAINTENANCE & SAFETY LOGS (Annex A-9, A-10, A-11)
 -- ════════════════════════════════════════════════════════════════════════════
@@ -396,6 +411,7 @@ CREATE INDEX IF NOT EXISTS idx_concurrence_mission ON public.concurrences(missio
 CREATE INDEX IF NOT EXISTS idx_checklist_mission  ON public.checklist_items(mission_id, checklist_type);
 CREATE INDEX IF NOT EXISTS idx_hira_mission       ON public.hira_rows(mission_id);
 CREATE INDEX IF NOT EXISTS idx_alerts_user        ON public.alerts(user_id, is_read);
+CREATE INDEX IF NOT EXISTS idx_mission_flights_mission ON public.mission_flights(mission_id);
 CREATE INDEX IF NOT EXISTS idx_maintenance_aircraft ON public.maintenance_logs(aircraft_id);
 CREATE INDEX IF NOT EXISTS idx_battery_aircraft   ON public.battery_logs(aircraft_id);
 CREATE INDEX IF NOT EXISTS idx_incident_aircraft  ON public.incident_reports(aircraft_id);
@@ -420,6 +436,7 @@ ALTER TABLE public.battery_logs       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.incident_reports   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.p2p_sessions       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.alerts             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.mission_flights    ENABLE ROW LEVEL SECURITY;
 
 -- Helper: resolve the caller's organization_id from profiles
 CREATE OR REPLACE FUNCTION public.my_org_id()
@@ -457,7 +474,7 @@ BEGIN
     'aircraft', 'missions', 'mission_crew', 'concurrences', 'flight_plans',
     'hira_rows', 'checklist_items', 'fit_to_fly_records', 'flight_logs',
     'maintenance_logs', 'battery_logs', 'incident_reports',
-    'p2p_sessions', 'alerts'
+    'p2p_sessions', 'alerts', 'mission_flights'
   ] LOOP
     EXECUTE format(
       'DROP POLICY IF EXISTS %I ON public.%I',

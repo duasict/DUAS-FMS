@@ -196,6 +196,20 @@ class SupabaseService {
           .eq('mission_ref', missionRef)
           .eq('organization_id', orgId);
 
+  // ── Mission Flights ───────────────────────────────────────────────────────
+
+  /// Replaces all flight legs for a mission (delete existing + insert new).
+  static Future<void> replaceMissionFlights(
+      String missionUuid, List<Map<String, dynamic>> flights) async {
+    await client
+        .from('mission_flights')
+        .delete()
+        .eq('mission_id', missionUuid);
+    if (flights.isNotEmpty) {
+      await client.from('mission_flights').insert(flights);
+    }
+  }
+
   // ── Standalone Logs ───────────────────────────────────────────────────────
 
   static Future<void> upsertMaintenanceLogs(List<Map<String, dynamic>> rows) =>

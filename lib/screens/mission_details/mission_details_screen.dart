@@ -57,7 +57,7 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
         .then((_) => _load());
   }
 
-  void _navigateToNextStep() {
+  Future<void> _navigateToNextStep() async {
     final m = _mission!;
     final id = m.id!;
     final title = m.title;
@@ -72,11 +72,22 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
     } else if (!m.hasFitToFlyComplete) {
       next = FitToFlyScreen(missionId: id, missionTitle: title);
     } else if (!m.hasPreflightComplete) {
-      next = PreflightChecklistScreen(missionId: id, missionTitle: title);
+      final flightNum =
+          await DatabaseHelper.instance.getMissionFlightCount(id) + 1;
+      next = PreflightChecklistScreen(
+          missionId: id, missionTitle: title, flightNum: flightNum);
     } else if (!m.hasInflightComplete) {
-      next = InflightChecklistScreen(missionId: id, missionTitle: title);
+      final flightNum = await DatabaseHelper.instance.getMissionFlightCount(id);
+      next = InflightChecklistScreen(
+          missionId: id,
+          missionTitle: title,
+          flightNum: flightNum > 0 ? flightNum : 1);
     } else if (!m.hasPostflightComplete) {
-      next = PostflightChecklistScreen(missionId: id, missionTitle: title);
+      final flightNum = await DatabaseHelper.instance.getMissionFlightCount(id);
+      next = PostflightChecklistScreen(
+          missionId: id,
+          missionTitle: title,
+          flightNum: flightNum > 0 ? flightNum : 1);
     } else if (!m.hasFlightlogComplete) {
       next = FlightLogScreen(missionId: id, missionTitle: title);
     } else {

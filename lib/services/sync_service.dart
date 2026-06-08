@@ -334,7 +334,27 @@ class SyncService {
       });
     }
 
-    // 8 — Mark this mission (and its flight log) as synced locally
+    // 8 — Mission flight legs (takeoff/landing times + GPS per flight)
+    final missionFlights =
+        await DatabaseHelper.instance.getMissionFlights(localId);
+    if (missionFlights.isNotEmpty) {
+      final flightPayload = missionFlights
+          .map((f) => {
+                'mission_id': missionUuid,
+                'flight_num': f.flightNum,
+                'takeoff_time': f.takeoffTime,
+                'landing_time': f.landingTime,
+                if (f.takeoffLat != null) 'takeoff_lat': f.takeoffLat,
+                if (f.takeoffLon != null) 'takeoff_lon': f.takeoffLon,
+                if (f.landingLat != null) 'landing_lat': f.landingLat,
+                if (f.landingLon != null) 'landing_lon': f.landingLon,
+                'organization_id': orgId,
+              })
+          .toList();
+      await SupabaseService.replaceMissionFlights(missionUuid, flightPayload);
+    }
+
+    // 9 — Mark this mission (and its flight log) as synced locally
     await DatabaseHelper.instance.markMissionSynced(localId);
   }
 }

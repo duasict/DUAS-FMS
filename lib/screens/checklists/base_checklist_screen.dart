@@ -101,9 +101,9 @@ class _BaseChecklistScreenState extends State<BaseChecklistScreen> {
       appBar: AppBar(
         title: Text(_titleFor(widget.checklistType)),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(32),
+          preferredSize: const Size.fromHeight(52),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
             child: ChecklistProgressBar(
                 current: widget.stepIndex, steps: widget.steps),
           ),

@@ -9,13 +9,14 @@ import '../models/checklist_item.dart';
 import '../models/flight_log.dart';
 import '../models/flight_plan.dart';
 import '../models/hira_row.dart';
+import '../models/mission_flight.dart';
 import '../models/user_profile.dart';
 import '../services/encryption_service.dart';
 import '../services/org_settings_service.dart';
 
 class DatabaseHelper {
   static const _dbName = 'uas_fms.db';
-  static const _dbVersion = 12;
+  static const _dbVersion = 13;
 
   DatabaseHelper._();
   static final DatabaseHelper instance = DatabaseHelper._();
@@ -261,6 +262,21 @@ class DatabaseHelper {
           "ALTER TABLE missions ADD COLUMN takeoff_time TEXT NOT NULL DEFAULT ''");
       await db.execute(
           "ALTER TABLE missions ADD COLUMN landing_time TEXT NOT NULL DEFAULT ''");
+    }
+    if (oldVersion < 13) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS mission_flights (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          mission_id INTEGER NOT NULL,
+          flight_num INTEGER NOT NULL,
+          takeoff_time TEXT NOT NULL DEFAULT '',
+          landing_time TEXT NOT NULL DEFAULT '',
+          takeoff_lat REAL,
+          takeoff_lon REAL,
+          landing_lat REAL,
+          landing_lon REAL
+        )
+      ''');
     }
   }
 
@@ -515,6 +531,20 @@ class DatabaseHelper {
         organization_id TEXT NOT NULL DEFAULT '',
         created_at TEXT NOT NULL,
         is_synced INTEGER DEFAULT 0
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE mission_flights (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        mission_id INTEGER NOT NULL,
+        flight_num INTEGER NOT NULL,
+        takeoff_time TEXT NOT NULL DEFAULT '',
+        landing_time TEXT NOT NULL DEFAULT '',
+        takeoff_lat REAL,
+        takeoff_lon REAL,
+        landing_lat REAL,
+        landing_lon REAL
       )
     ''');
 
@@ -1071,6 +1101,51 @@ class DatabaseHelper {
     final db = await database;
     await db.update('flight_logs', log.toMap(),
         where: 'id = ?', whereArgs: [log.id]);
+  }
+
+  // ─── Mission flights ───────────────────────────────────────────────────────
+
+  Future<int> insertMissionFlight(MissionFlight f) async {
+    final db = await database;
+    return db.insert('mission_flights', f.toMap());
+  }
+
+  Future<void> updateMissionFlight(MissionFlight f) async {
+    final db = await database;
+    await db.update('mission_flights', f.toMap(),
+        where: 'id = ?', whereArgs: [f.id]);
+  }
+
+  Future<List<MissionFlight>> getMissionFlights(int missionId) async {
+    final db = await database;
+    final rows = await db.query(
+      'mission_flights',
+      where: 'mission_id = ?',
+      whereArgs: [missionId],
+      orderBy: 'flight_num ASC',
+    );
+    return rows.map(MissionFlight.fromMap).toList();
+  }
+
+  Future<MissionFlight?> getMissionFlightByNum(
+      int missionId, int flightNum) async {
+    final db = await database;
+    final rows = await db.query(
+      'mission_flights',
+      where: 'mission_id = ? AND flight_num = ?',
+      whereArgs: [missionId, flightNum],
+    );
+    if (rows.isEmpty) return null;
+    return MissionFlight.fromMap(rows.first);
+  }
+
+  Future<int> getMissionFlightCount(int missionId) async {
+    final db = await database;
+    final rows = await db.rawQuery(
+      'SELECT COUNT(*) AS cnt FROM mission_flights WHERE mission_id = ?',
+      [missionId],
+    );
+    return (rows.first['cnt'] as int?) ?? 0;
   }
 
   // ─── Sync helpers ─────────────────────────────────────────────────────────

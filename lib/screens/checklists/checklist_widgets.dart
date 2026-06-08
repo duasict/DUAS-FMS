@@ -1,5 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../theme/app_theme.dart';
+
+/// Captures the device's current GPS position after checklist confirmation.
+/// Returns null lat/lon silently if location is unavailable or denied.
+Future<({double? lat, double? lon})> captureGps() async {
+  try {
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      return (lat: null, lon: null);
+    }
+    final perm = await Geolocator.checkPermission();
+    if (perm == LocationPermission.denied ||
+        perm == LocationPermission.deniedForever) {
+      return (lat: null, lon: null);
+    }
+    final pos = await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+    );
+    return (lat: pos.latitude, lon: pos.longitude);
+  } catch (_) {
+    return (lat: null, lon: null);
+  }
+}
 
 /// Shows a full-screen-blocking dialog prompting the user to confirm a
 /// timestamped event (take-off or landing).
@@ -108,83 +130,86 @@ class ChecklistProgressBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final stepList = steps ?? _defaultSteps;
-    // Divider flex is intentionally small so steps keep as much width as
-    // possible. Steps use flex:3, dividers flex:1.
-    return Row(
-      children: List.generate(stepList.length * 2 - 1, (i) {
-        if (i.isOdd) {
-          // Connector line — colored green when the step to the left is done
-          final leftDone = (i ~/ 2) < current;
-          return Expanded(
-            flex: 1,
-            child: Container(
-              height: 1.5,
-              color: leftDone
-                  ? AppColors.success.withValues(alpha: 0.5)
-                  : context.colors.border,
-            ),
-          );
-        }
-
-        final idx = i ~/ 2;
-        final done = idx < current;
-        final active = idx == current;
-
-        final circleColor = done
-            ? AppColors.success
-            : active
-                ? AppColors.primary
-                : context.colors.border;
-        final circleFill = done
-            ? AppColors.success.withValues(alpha: 0.12)
-            : active
-                ? AppColors.primary.withValues(alpha: 0.12)
-                : Colors.transparent;
-        final labelColor = done
-            ? AppColors.success
-            : active
-                ? AppColors.primaryLight
-                : context.colors.textMuted;
-
-        return Flexible(
-          flex: 3,
-          // Loose fit: takes at most its share, never forces overflow
-          fit: FlexFit.loose,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 20,
-                height: 20,
-                decoration: BoxDecoration(
-                  color: circleFill,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: circleColor, width: 1.5),
-                ),
-                child: Icon(
-                  done ? Icons.check : Icons.circle,
-                  size: 10,
-                  color: circleColor,
+    // Vertical layout: circle above, label below, centered.
+    // Connector lines are padded to align with circle mid-points (10 px top
+    // offset = half the 20 px circle height).
+    return SizedBox(
+      height: 48,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: List.generate(stepList.length * 2 - 1, (i) {
+          if (i.isOdd) {
+            final leftDone = (i ~/ 2) < current;
+            return Expanded(
+              flex: 1,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 9.5),
+                child: Container(
+                  height: 1.5,
+                  color: leftDone
+                      ? AppColors.success.withValues(alpha: 0.5)
+                      : context.colors.border,
                 ),
               ),
-              const SizedBox(width: 3),
-              // Flexible text: clips with ellipsis rather than overflowing
-              Flexible(
-                child: Text(
+            );
+          }
+
+          final idx = i ~/ 2;
+          final done = idx < current;
+          final active = idx == current;
+
+          final circleColor = done
+              ? AppColors.success
+              : active
+                  ? AppColors.primary
+                  : context.colors.border;
+          final circleFill = done
+              ? AppColors.success.withValues(alpha: 0.12)
+              : active
+                  ? AppColors.primary.withValues(alpha: 0.12)
+                  : Colors.transparent;
+          final labelColor = done
+              ? AppColors.success
+              : active
+                  ? AppColors.primaryLight
+                  : context.colors.textMuted;
+
+          return Expanded(
+            flex: 3,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: circleFill,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: circleColor, width: 1.5),
+                  ),
+                  child: Icon(
+                    done ? Icons.check : Icons.circle,
+                    size: 10,
+                    color: circleColor,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
                   stepList[idx],
+                  textAlign: TextAlign.center,
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
                   style: TextStyle(
                     color: labelColor,
-                    fontSize: 10,
+                    fontSize: 9,
                     fontWeight: active ? FontWeight.w700 : FontWeight.w400,
                   ),
                 ),
-              ),
-            ],
-          ),
-        );
-      }),
+              ],
+            ),
+          );
+        }),
+      ),
     );
   }
 }

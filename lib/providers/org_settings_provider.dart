@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/org_settings_service.dart';
+import '../theme/app_theme.dart';
 
 /// Provides org-level white-label settings throughout the widget tree.
 /// Loaded once at startup; updated whenever [save] is called.
@@ -18,7 +19,7 @@ class OrgSettingsProvider extends ChangeNotifier {
   String get missionPrefix => _settings.missionPrefix;
   String get slogan        => _settings.slogan;
   String get logoPath      => _settings.logoPath;
-  Color  get primaryColor  => Color(_settings.primaryColorValue);
+  Color  get primaryColor  => AppColors.primary;
 
   Future<void> load() async {
     _configured = await OrgSettingsService.isConfigured();

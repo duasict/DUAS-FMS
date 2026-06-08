@@ -36,13 +36,15 @@ class CoverageMapScreen extends StatefulWidget {
   /// Pre-existing vertices to resume editing, if any.
   final List<LatLng>? initialPoints;
 
-  /// Starting map centre — defaults to central Philippines.
-  final LatLng initialCenter;
+  /// Starting map centre. When non-null the map opens at this coordinate and
+  /// GPS auto-locate is skipped. When null, the map falls back to GPS (or the
+  /// Philippines default if GPS is unavailable).
+  final LatLng? initialCenter;
 
   const CoverageMapScreen({
     super.key,
     this.initialPoints,
-    this.initialCenter = const LatLng(14.5, 121.0),
+    this.initialCenter,
   });
 
   @override
@@ -74,11 +76,20 @@ class _CoverageMapScreenState extends State<CoverageMapScreen> {
   // ── Map interaction ──────────────────────────────────────────────────────────
 
   void _onMapReady() {
-    // Auto-locate only when there are no pre-existing points — if the user
-    // is editing an existing polygon, jump to its centroid instead.
-    if (widget.initialPoints == null || widget.initialPoints!.isEmpty) {
-      _autoLocate();
+    final hasPoints =
+        widget.initialPoints != null && widget.initialPoints!.isNotEmpty;
+    if (hasPoints) {
+      // Editing an existing polygon — the map already opens at initialCenter
+      // (which is the polygon's area); no further action needed.
+      return;
     }
+    if (widget.initialCenter != null) {
+      // Mission coordinates provided — map already starts there via
+      // MapOptions.initialCenter; skip GPS auto-locate.
+      return;
+    }
+    // No mission coordinates — fall back to GPS position.
+    _autoLocate();
   }
 
   void _onTap(TapPosition _, LatLng ll) {
@@ -220,7 +231,7 @@ class _CoverageMapScreenState extends State<CoverageMapScreen> {
         FlutterMap(
           mapController: _mapCtrl,
           options: MapOptions(
-            initialCenter: widget.initialCenter,
+            initialCenter: widget.initialCenter ?? const LatLng(14.5, 121.0),
             initialZoom: 14,
             onTap: _onTap,
             onMapReady: _onMapReady,

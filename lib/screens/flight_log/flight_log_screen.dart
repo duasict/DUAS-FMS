@@ -17,8 +17,22 @@ class FlightLogScreen extends StatefulWidget {
 }
 
 class _FlightEntry {
-  final TextEditingController takeoff = TextEditingController();
-  final TextEditingController landing = TextEditingController();
+  final TextEditingController takeoff;
+  final TextEditingController landing;
+  final double? takeoffLat;
+  final double? takeoffLon;
+  final double? landingLat;
+  final double? landingLon;
+
+  _FlightEntry({
+    TextEditingController? takeoff,
+    TextEditingController? landing,
+    this.takeoffLat,
+    this.takeoffLon,
+    this.landingLat,
+    this.landingLon,
+  })  : takeoff = takeoff ?? TextEditingController(),
+        landing = landing ?? TextEditingController();
 
   void dispose() {
     takeoff.dispose();
@@ -72,7 +86,7 @@ class _FlightLogScreenState extends State<FlightLogScreen> {
   final Set<String> _anomalies = {};
   bool _lidar = false;
 
-  final _flight = _FlightEntry();
+  List<_FlightEntry> _flights = [];
 
   static const _payloadOptions = [
     'RGB (24MP)', 'RGB (61MP)', 'Multispectral', 'EO/IR', 'LiDAR', 'Cargo',
@@ -96,6 +110,9 @@ class _FlightLogScreenState extends State<FlightLogScreen> {
 
   Future<void> _loadMission() async {
     final m = await DatabaseHelper.instance.getMissionById(widget.missionId);
+    final missionFlights =
+        await DatabaseHelper.instance.getMissionFlights(widget.missionId);
+
     if (m != null && mounted) {
       setState(() {
         _locationCtrl.text = m.location;
@@ -110,13 +127,35 @@ class _FlightLogScreenState extends State<FlightLogScreen> {
           if (r == 'vo') _voCtrl.text = c.name;
           if (r == 'tech') _techCtrl.text = c.name;
         }
-        // Pre-populate take-off / landing from checklist confirmation timestamps.
-        if (m.takeoffTime.isNotEmpty) _flight.takeoff.text = m.takeoffTime;
-        if (m.landingTime.isNotEmpty) _flight.landing.text = m.landingTime;
+
+        if (missionFlights.isNotEmpty) {
+          _flights = missionFlights
+              .map((f) => _FlightEntry(
+                    takeoff: TextEditingController(text: f.takeoffTime),
+                    landing: TextEditingController(text: f.landingTime),
+                    takeoffLat: f.takeoffLat,
+                    takeoffLon: f.takeoffLon,
+                    landingLat: f.landingLat,
+                    landingLon: f.landingLon,
+                  ))
+              .toList();
+        } else {
+          // Fallback for missions created before multi-flight support.
+          _flights = [
+            _FlightEntry(
+              takeoff: TextEditingController(text: m.takeoffTime),
+              landing: TextEditingController(text: m.landingTime),
+            )
+          ];
+        }
+
         _isLoading = false;
       });
     } else if (mounted) {
-      setState(() => _isLoading = false);
+      setState(() {
+        _flights = [_FlightEntry()];
+        _isLoading = false;
+      });
     }
   }
 
@@ -133,17 +172,18 @@ class _FlightLogScreenState extends State<FlightLogScreen> {
 
   @override
   void dispose() {
-    final controllers = [
+    for (final c in [
       _dateTimeCtrl, _locationCtrl, _latCtrl, _lonCtrl, _altAglCtrl,
       _highestPointCtrl, _landingZoneCtrl, _modelCtrl, _mtowCtrl,
       _rpicCtrl, _voCtrl, _techCtrl, _windCtrl, _visibilityCtrl,
       _cloudCtrl, _notamsRefCtrl, _anomalyOtherCtrl, _geotiffCtrl,
       _photosCtrl, _videoCtrl, _nextMaintenanceCtrl,
-    ];
-    for (final c in controllers) {
+    ]) {
       c.dispose();
     }
-    _flight.dispose();
+    for (final f in _flights) {
+      f.dispose();
+    }
     super.dispose();
   }
 
@@ -152,32 +192,38 @@ class _FlightLogScreenState extends State<FlightLogScreen> {
     final provider = context.read<AppProvider>();
     final navigator = Navigator.of(context);
 
-    final flightList = (_flight.takeoff.text.isNotEmpty ||
-            _flight.landing.text.isNotEmpty)
-        ? [
-            FlightDuration(
-              flightNum: '1',
-              takeoff: _flight.takeoff.text,
-              landing: _flight.landing.text,
-              totalMin: _flight.totalMin,
-            )
-          ]
-        : <FlightDuration>[];
+    final flightList = _flights
+        .asMap()
+        .entries
+        .where((e) =>
+            e.value.takeoff.text.isNotEmpty || e.value.landing.text.isNotEmpty)
+        .map((e) => FlightDuration(
+              flightNum: '${e.key + 1}',
+              takeoff: e.value.takeoff.text,
+              landing: e.value.landing.text,
+              totalMin: e.value.totalMin,
+              takeoffLat: e.value.takeoffLat,
+              takeoffLon: e.value.takeoffLon,
+              landingLat: e.value.landingLat,
+              landingLon: e.value.landingLon,
+            ))
+        .toList();
 
-    final totalMin = _flight.totalMin;
+    final totalMin = _flights.fold(0, (sum, f) => sum + f.totalMin);
 
-    final anomalyList = _anomalies.contains('Other') && _anomalyOtherCtrl.text.isNotEmpty
-        ? ([..._anomalies.where((a) => a != 'Other'),
-            'Other: ${_anomalyOtherCtrl.text}'])
-        : _anomalies.toList();
+    final anomalyList =
+        _anomalies.contains('Other') && _anomalyOtherCtrl.text.isNotEmpty
+            ? ([
+                ..._anomalies.where((a) => a != 'Other'),
+                'Other: ${_anomalyOtherCtrl.text}'
+              ])
+            : _anomalies.toList();
 
     String notams = _notamsType;
     if (_notamsType != 'None' && _notamsRefCtrl.text.isNotEmpty) {
-      if (_notamsType == 'Active') {
-        notams = 'Active (Ref: ${_notamsRefCtrl.text})';
-      } else {
-        notams = 'CAAP Permit (No: ${_notamsRefCtrl.text})';
-      }
+      notams = _notamsType == 'Active'
+          ? 'Active (Ref: ${_notamsRefCtrl.text})'
+          : 'CAAP Permit (No: ${_notamsRefCtrl.text})';
     }
 
     final log = FlightLog(
@@ -222,19 +268,12 @@ class _FlightLogScreenState extends State<FlightLogScreen> {
       mission.hasFlightlogComplete = true;
       mission.status = 'completed';
       if (totalMin > 0) mission.duration = totalMin;
-      // Write directly to the DB so the transition guard in
-      // AppProvider.updateMission() (which only allows in_progress → completed)
-      // does not block missions that reach this screen while still in 'planning'.
-      // Submitting the flight log is the definitive completion action regardless
-      // of intermediate checklist state.
       await DatabaseHelper.instance.updateMission(mission);
       await provider.refreshMissions();
     }
 
     if (!mounted) return;
     final online = provider.isOnline;
-    // Fire-and-forget background sync so the completed mission reaches
-    // Supabase immediately without blocking the UI.
     if (online) provider.syncData();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -254,9 +293,9 @@ class _FlightLogScreenState extends State<FlightLogScreen> {
       appBar: AppBar(
         title: const Text('Flight Log & Report'),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(32),
+          preferredSize: const Size.fromHeight(52),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
             child: ChecklistProgressBar(current: 3),
           ),
         ),
@@ -274,14 +313,14 @@ class _FlightLogScreenState extends State<FlightLogScreen> {
                   _field('Location', _locationCtrl),
                   Row(children: [
                     Expanded(child: _field('Latitude', _latCtrl, hint: '0.0000')),
-                    SizedBox(width: 10),
+                    const SizedBox(width: 10),
                     Expanded(child: _field('Longitude', _lonCtrl, hint: '0.0000')),
                   ]),
                 ]),
                 _logSection('ALTITUDE & LANDING ZONE', Icons.height, [
                   Row(children: [
                     Expanded(child: _field('Altitude AGL (m)', _altAglCtrl, hint: '0')),
-                    SizedBox(width: 10),
+                    const SizedBox(width: 10),
                     Expanded(child: _field('Highest Pt (m)', _highestPointCtrl, hint: '0')),
                   ]),
                   _field('Landing Zone', _landingZoneCtrl),
@@ -349,9 +388,8 @@ class _FlightLogScreenState extends State<FlightLogScreen> {
                   _field('VO (Visual Observer)', _voCtrl, readOnly: true),
                   _field('Tech / Payload Operator', _techCtrl, readOnly: true),
                 ]),
-                _logSection('FLIGHT DURATION', Icons.timer_outlined, [
-                  _singleFlightRow(),
-                ]),
+                _logSection('FLIGHT DURATION', Icons.timer_outlined,
+                    [_flightDurationSection()]),
                 _logSection('WEATHER', Icons.cloud_outlined, [
                   Row(children: [
                     Expanded(child: _field('Wind (m/s)', _windCtrl, hint: '0.0')),
@@ -423,19 +461,19 @@ class _FlightLogScreenState extends State<FlightLogScreen> {
                 _logSection('DATA CAPTURED', Icons.storage_outlined, [
                   Row(children: [
                     Expanded(child: _field('GeoTIFF (ha)', _geotiffCtrl, hint: '0.0')),
-                    SizedBox(width: 10),
+                    const SizedBox(width: 10),
                     Expanded(child: _field('Photos', _photosCtrl, hint: '0')),
-                    SizedBox(width: 10),
+                    const SizedBox(width: 10),
                     Expanded(child: _field('Video (min)', _videoCtrl, hint: '0')),
                   ]),
-                  SizedBox(height: 10),
+                  const SizedBox(height: 10),
                   Row(children: [
                     Switch(
                       value: _lidar,
                       onChanged: (v) => setState(() => _lidar = v),
                       activeThumbColor: AppColors.primary,
                     ),
-                    SizedBox(width: 8),
+                    const SizedBox(width: 8),
                     Text('LiDAR data collected',
                         style: TextStyle(
                             color: context.colors.textSecondary, fontSize: 13)),
@@ -477,10 +515,181 @@ class _FlightLogScreenState extends State<FlightLogScreen> {
     );
   }
 
+  // ── Flight duration section with multiple rows ──────────────────────────────
+
+  Widget _flightDurationSection() {
+    final totalMins = _flights.fold(0, (sum, f) => sum + f.totalMin);
+    final h = totalMins ~/ 60;
+    final m = totalMins % 60;
+    final totalLabel =
+        totalMins > 0 ? (h > 0 ? '$h h $m min' : '$m min') : '—';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ..._flights.asMap().entries.map((e) => _flightRow(e.key, e.value)),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: () => setState(() => _flights.add(_FlightEntry())),
+          icon: const Icon(Icons.add, size: 16),
+          label: const Text('Add flight'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: context.colors.textSecondary,
+            side: BorderSide(color: context.colors.border),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            textStyle:
+                const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(8),
+            border:
+                Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+          ),
+          child: Row(children: [
+            const Icon(Icons.timer_outlined,
+                size: 14, color: AppColors.primary),
+            const SizedBox(width: 6),
+            Text('Total flight time: ',
+                style: TextStyle(
+                    color: context.colors.textSecondary, fontSize: 12)),
+            Text(totalLabel,
+                style: const TextStyle(
+                    color: AppColors.primaryLight,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700)),
+            if (totalMins > 0) ...[
+              const SizedBox(width: 6),
+              Text('($totalMins min)',
+                  style: TextStyle(
+                      color: context.colors.textMuted, fontSize: 11)),
+            ],
+          ]),
+        ),
+      ],
+    );
+  }
+
+  Widget _flightRow(int idx, _FlightEntry entry) {
+    final flightLabel = 'Flight ${idx + 1}';
+    final mins = entry.totalMin;
+    final h = mins ~/ 60;
+    final m = mins % 60;
+    final dur = mins > 0 ? (h > 0 ? '$h h $m min' : '$m min') : null;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: context.colors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Icon(Icons.flight, size: 13, color: context.colors.textMuted),
+            const SizedBox(width: 6),
+            Text(flightLabel,
+                style: TextStyle(
+                    color: context.colors.textMuted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.5)),
+            const Spacer(),
+            if (dur != null)
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(dur,
+                    style: const TextStyle(
+                        color: AppColors.primaryLight,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600)),
+              ),
+            if (_flights.length > 1) ...[
+              const SizedBox(width: 4),
+              GestureDetector(
+                onTap: () => setState(() {
+                  entry.dispose();
+                  _flights.removeAt(idx);
+                }),
+                child: Icon(Icons.close,
+                    size: 16, color: context.colors.textMuted),
+              ),
+            ],
+          ]),
+          const SizedBox(height: 8),
+          Row(children: [
+            Expanded(
+              child: _field('Take-off (HH:MM)', entry.takeoff,
+                  hint: '08:00',
+                  onChanged: () => setState(() {})),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _field('Landing (HH:MM)', entry.landing,
+                  hint: '09:30',
+                  onChanged: () => setState(() {})),
+            ),
+          ]),
+          // GPS coordinates captured at confirmation — read-only info
+          if (entry.takeoffLat != null || entry.landingLat != null) ...[
+            const SizedBox(height: 6),
+            Row(children: [
+              if (entry.takeoffLat != null) ...[
+                Icon(Icons.flight_takeoff,
+                    size: 11, color: AppColors.success),
+                const SizedBox(width: 3),
+                Expanded(
+                  child: Text(
+                    '${entry.takeoffLat!.toStringAsFixed(5)}, '
+                    '${entry.takeoffLon!.toStringAsFixed(5)}',
+                    style: TextStyle(
+                        color: context.colors.textMuted, fontSize: 10),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+              if (entry.takeoffLat != null && entry.landingLat != null)
+                const SizedBox(width: 8),
+              if (entry.landingLat != null) ...[
+                Icon(Icons.flight_land,
+                    size: 11, color: AppColors.primary),
+                const SizedBox(width: 3),
+                Expanded(
+                  child: Text(
+                    '${entry.landingLat!.toStringAsFixed(5)}, '
+                    '${entry.landingLon!.toStringAsFixed(5)}',
+                    style: TextStyle(
+                        color: context.colors.textMuted, fontSize: 10),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ]),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ── Shared helpers ──────────────────────────────────────────────────────────
+
   Widget _logSection(String title, IconData icon, List<Widget> children) {
     return Container(
-      margin: EdgeInsets.only(bottom: 10),
-      padding: EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: context.colors.card,
         borderRadius: BorderRadius.circular(12),
@@ -489,26 +698,24 @@ class _FlightLogScreenState extends State<FlightLogScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(icon, size: 14, color: context.colors.textMuted),
-              SizedBox(width: 6),
-              Text(
-                title,
-                style: TextStyle(
-                  color: context.colors.textMuted,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.8,
-                ),
+          Row(children: [
+            Icon(icon, size: 14, color: context.colors.textMuted),
+            const SizedBox(width: 6),
+            Text(
+              title,
+              style: TextStyle(
+                color: context.colors.textMuted,
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.8,
               ),
-            ],
-          ),
-          SizedBox(height: 10),
-          Divider(height: 1),
-          SizedBox(height: 10),
+            ),
+          ]),
+          const SizedBox(height: 10),
+          const Divider(height: 1),
+          const SizedBox(height: 10),
           ...children.map((c) => Padding(
-                padding: EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.only(bottom: 8),
                 child: c,
               )),
         ],
@@ -535,7 +742,7 @@ class _FlightLogScreenState extends State<FlightLogScreen> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: selected
               ? AppColors.primary.withValues(alpha: 0.15)
@@ -552,68 +759,10 @@ class _FlightLogScreenState extends State<FlightLogScreen> {
                 ? AppColors.primaryLight
                 : context.colors.textSecondary,
             fontSize: 12,
-            fontWeight:
-                selected ? FontWeight.w600 : FontWeight.w400,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
           ),
         ),
       ),
-    );
-  }
-
-  Widget _singleFlightRow() {
-    final mins = _flight.totalMin;
-    final h = mins ~/ 60;
-    final m = mins % 60;
-    final durationLabel = mins > 0
-        ? (h > 0 ? '$h h $m min' : '$m min')
-        : '—';
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(children: [
-          Expanded(
-            child: _field('Take-off (HH:MM)', _flight.takeoff,
-                hint: '08:00',
-                onChanged: () => setState(() {})),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _field('Landing (HH:MM)', _flight.landing,
-                hint: '09:30',
-                onChanged: () => setState(() {})),
-          ),
-        ]),
-        const SizedBox(height: 10),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.06),
-            borderRadius: BorderRadius.circular(8),
-            border:
-                Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
-          ),
-          child: Row(children: [
-            const Icon(Icons.timer_outlined,
-                size: 14, color: AppColors.primary),
-            const SizedBox(width: 6),
-            Text('Total flight time: ',
-                style: TextStyle(
-                    color: context.colors.textSecondary, fontSize: 12)),
-            Text(durationLabel,
-                style: const TextStyle(
-                    color: AppColors.primaryLight,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700)),
-            if (mins > 0) ...[
-              const SizedBox(width: 6),
-              Text('($mins min)',
-                  style: TextStyle(
-                      color: context.colors.textMuted, fontSize: 11)),
-            ],
-          ]),
-        ),
-      ],
     );
   }
 }
@@ -627,7 +776,7 @@ class _SubmitFooter extends StatelessWidget {
   Widget build(BuildContext context) {
     return SafeArea(
       child: Container(
-        padding: EdgeInsets.fromLTRB(16, 10, 16, 12),
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
         decoration: BoxDecoration(
           color: context.colors.surface,
           border: Border(top: BorderSide(color: context.colors.border)),

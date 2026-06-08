@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../database/database_helper.dart';
+import '../../models/mission_flight.dart';
 import '../../providers/app_provider.dart';
+import '../../utils/app_constants.dart';
 import '../../theme/app_theme.dart';
 import 'base_checklist_screen.dart';
 import 'checklist_widgets.dart';
@@ -10,8 +12,15 @@ import 'postflight_checklist_screen.dart';
 class InflightChecklistScreen extends StatelessWidget {
   final int missionId;
   final String missionTitle;
-  const InflightChecklistScreen(
-      {super.key, required this.missionId, required this.missionTitle});
+  /// 1-based flight number within this mission.
+  final int flightNum;
+
+  const InflightChecklistScreen({
+    super.key,
+    required this.missionId,
+    required this.missionTitle,
+    this.flightNum = 1,
+  });
 
   static const _defs = [
     ('A. LAUNCH CHECKLIST', 'GCS final telemetry OK (GPS 3D, AHRS stable)'),
@@ -40,7 +49,8 @@ class InflightChecklistScreen extends StatelessWidget {
       missionTitle: missionTitle,
       defs: _defs,
       checklistType: 'inflight',
-      stepIndex: 1,
+      stepIndex: 3,
+      steps: AppConstants.executionChecklistSteps,
       submitLabel: 'Submit & Confirm Landing',
       onSubmitComplete: (ctx, id, title) async {
         final provider = ctx.read<AppProvider>();
@@ -53,24 +63,40 @@ class InflightChecklistScreen extends StatelessWidget {
 
         final landingTime = await showTimeConfirmationDialog(
           ctx,
-          title: 'Confirm Landing',
+          title: 'Confirm Landing  (Flight $flightNum)',
           confirmLabel: 'Confirm Landing',
           icon: Icons.flight_land,
           color: AppColors.primary,
         );
+        if (!ctx.mounted) return;
 
-        if (landingTime != null) {
-          final m = await DatabaseHelper.instance.getMissionById(id);
-          if (m != null) {
-            m.landingTime = landingTime;
-            await DatabaseHelper.instance.updateMission(m);
-          }
+        final gps = await captureGps();
+
+        final existing =
+            await DatabaseHelper.instance.getMissionFlightByNum(id, flightNum);
+        if (existing != null) {
+          existing.landingTime = landingTime ?? '';
+          existing.landingLat = gps.lat;
+          existing.landingLon = gps.lon;
+          await DatabaseHelper.instance.updateMissionFlight(existing);
+        } else {
+          // Edge case: no takeoff row yet — create one with landing data only.
+          await DatabaseHelper.instance.insertMissionFlight(MissionFlight(
+            missionId: id,
+            flightNum: flightNum,
+            landingTime: landingTime ?? '',
+            landingLat: gps.lat,
+            landingLon: gps.lon,
+          ));
         }
 
         if (!ctx.mounted) return;
         Navigator.of(ctx).push(MaterialPageRoute(
-          builder: (_) =>
-              PostflightChecklistScreen(missionId: id, missionTitle: title),
+          builder: (_) => PostflightChecklistScreen(
+            missionId: id,
+            missionTitle: title,
+            flightNum: flightNum,
+          ),
         ));
       },
     );
