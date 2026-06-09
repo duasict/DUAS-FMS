@@ -14,7 +14,7 @@ DUAS FMS Mobile provides a complete end-to-end mission management workflow for R
 
 ### Mission Management
 - Create and track missions with full crew assignment (RPIC, VO/GCS, Tech)
-- Guided 7-step mission execution flow: Flight Plan → HIRA → Equipment Checklist → Fit-to-Fly → Pre-flight → In-flight → Post-flight → Flight Log
+- Guided 8-step mission execution flow: Flight Plan → HIRA → Equipment Checklist → Fit-to-Fly → Pre-flight → In-flight → Post-flight → Flight Log
 - Mission status tracking: Planning, In Progress, Completed, Cancelled
 - CRP advisory notes and automatic concurrence flagging when HIRA residual risk ≥ 9
 
@@ -81,7 +81,7 @@ DUAS FMS Mobile provides a complete end-to-end mission management workflow for R
 lib/
 ├── database/          # SQLite DatabaseHelper (offline-first, v6 schema)
 ├── models/            # Data models: Mission, Aircraft, UserProfile, HiraRow, etc.
-├── providers/         # ChangeNotifier providers (App, Theme, UserProfile)
+├── providers/         # ChangeNotifier providers (App, Theme, UserProfile, OrgSettings)
 ├── screens/
 │   ├── aircraft/      # Fleet management
 │   ├── alerts/        # Notification centre
@@ -152,15 +152,15 @@ supabase/
 
 ### White-labelling
 
-All org-specific strings live in `lib/utils/app_constants.dart`:
+Org branding is configured entirely within the app via the **Org Setup** screen (accessible after first login or from Settings). The following can be set without touching code:
 
-```dart
-static const String appName       = 'DUAS';
-static const String orgName       = 'Davao UAS';
-static const String missionPrefix = 'UAS';  // e.g. UAS-2025-001
-```
+- Organisation name and tagline
+- Short app name (shown on the splash screen)
+- Mission ID prefix (e.g. `UAS` → `UAS-2025-001`)
+- Org logo (picked from the device gallery)
+- Login slogan
 
-Swap these values and replace `assets/icons/app_icon.png` to rebrand for a different unit.
+Default fallback values live in `lib/utils/app_constants.dart` and `lib/services/org_settings_service.dart`. Replace `assets/icons/app_icon.png` to change the launcher icon.
 
 ---
 
@@ -168,10 +168,10 @@ Swap these values and replace `assets/icons/app_icon.png` to rebrand for a diffe
 
 The app uses a **dual-database** architecture:
 
-- **SQLite** (local) — primary store, always available offline. Schema version 6.
+- **SQLite** (local) — primary store, always available offline. Schema version 13.
 - **Supabase / PostgreSQL** (cloud) — sync target with full RLS multi-tenancy.
 
-Key tables: `organizations`, `profiles`, `missions`, `mission_crew`, `hira_rows`, `checklist_items`, `flight_plans`, `fit_to_fly_records`, `flight_logs`, `concurrences`, `maintenance_logs`, `battery_logs`, `incident_reports`, `alerts`.
+Key tables: `organizations`, `profiles`, `missions`, `mission_crew`, `mission_flights`, `hira_rows`, `checklist_items`, `flight_plans`, `fit_to_fly_records`, `flight_logs`, `concurrences`, `maintenance_logs`, `battery_logs`, `incident_reports`, `alerts`.
 
 All tables are isolated by `organization_id` via the `my_org_id()` RLS helper function.
 
