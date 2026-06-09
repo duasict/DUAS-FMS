@@ -1,8 +1,9 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../../database/database_helper.dart';
 import '../../services/org_settings_service.dart';
 import '../../services/pdf_generator_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/app_bar_title.dart';
 import 'incident_report_screen.dart';
 
 class IncidentHistoryScreen extends StatefulWidget {
@@ -62,7 +63,7 @@ class _IncidentHistoryScreenState extends State<IncidentHistoryScreen> {
     switch (s) {
       case 'moderate': return AppColors.warning;
       case 'serious':  return AppColors.danger;
-      case 'fatal':    return AppColors.dangerDark;
+      case 'fatal':    return AppColors.danger;
       default:         return AppColors.success;
     }
   }
@@ -91,7 +92,7 @@ class _IncidentHistoryScreenState extends State<IncidentHistoryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Incident Reports'),
+        title: const AppBarTitle(title: 'Incident Reports', subtitle: 'CAAP incident history'),
       ),
       body: _isLoading
           ? const Center(
@@ -139,6 +140,7 @@ class _IncidentHistoryScreenState extends State<IncidentHistoryScreen> {
                   ),
                 ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: null,
         onPressed: () async {
           await Navigator.push(
             context,
@@ -148,7 +150,7 @@ class _IncidentHistoryScreenState extends State<IncidentHistoryScreen> {
         },
         icon: const Icon(Icons.add, size: 20),
         label: const Text('New Report'),
-        backgroundColor: AppColors.warning,
+        backgroundColor: AppColors.accent,
         foregroundColor: Colors.white,
       ),
     );

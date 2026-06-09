@@ -1,9 +1,10 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/mission.dart';
 import '../../providers/app_provider.dart';
 import '../../providers/user_profile_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/app_bar_title.dart';
 import '../../widgets/mission_card.dart';
 import '../../widgets/skeleton_loader.dart';
 import '../mission_details/mission_details_screen.dart';
@@ -23,20 +24,20 @@ class _MissionsScreenState extends State<MissionsScreen>
   final _searchCtrl = TextEditingController();
   String _query = '';
 
-  // Sub-filter inside the "Upcoming" tab: null = All, or 'planning' / 'in_progress'
-  String? _statusFilter;
+  String? _upcomingFilter;   // null = All, 'planning', 'in_progress'
+  String? _completedFilter;  // null = All, 'completed', 'cancelled'
 
   @override
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 2, vsync: this);
     _tabCtrl.addListener(() {
-      // Clear status filter when switching away from Upcoming tab
-      if (_tabCtrl.indexIsChanging && _tabCtrl.index != 0) {
-        setState(() => _statusFilter = null);
-      } else {
-        setState(() {}); // rebuild to show/hide chips
-      }
+      setState(() {
+        if (_tabCtrl.indexIsChanging) {
+          _upcomingFilter  = null;
+          _completedFilter = null;
+        }
+      });
     });
   }
 
@@ -53,13 +54,28 @@ class _MissionsScreenState extends State<MissionsScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Missions'),
+        title: const AppBarTitle(title: 'Missions', subtitle: 'Upcoming & completed operations'),
         bottom: PreferredSize(
-          preferredSize: Size.fromHeight(isUpcomingTab ? 138 : 88),
+          preferredSize: const Size.fromHeight(142),
           child: Column(children: [
+            // ── Tabs ──────────────────────────────────────────────────
+            TabBar(
+              controller: _tabCtrl,
+              indicatorColor: AppColors.primary,
+              indicatorWeight: 2.5,
+              indicatorSize: TabBarIndicatorSize.label,
+              labelColor: AppColors.primaryLight,
+              unselectedLabelColor: context.colors.textMuted,
+              dividerColor: context.colors.border,
+              tabs: const [
+                Tab(text: 'Upcoming'),
+                Tab(text: 'Completed'),
+              ],
+            ),
             // ── Search bar ────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+            Container(
+              color: context.colors.background,
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
               child: SizedBox(
                 height: 38,
                 child: TextField(
@@ -101,50 +117,60 @@ class _MissionsScreenState extends State<MissionsScreen>
                 ),
               ),
             ),
-            // ── Tabs ──────────────────────────────────────────────────
-            TabBar(
-              controller: _tabCtrl,
-              indicatorColor: AppColors.primary,
-              indicatorWeight: 2.5,
-              indicatorSize: TabBarIndicatorSize.label,
-              labelColor: AppColors.primaryLight,
-              unselectedLabelColor: context.colors.textMuted,
-              dividerColor: context.colors.border,
-              tabs: const [
-                Tab(text: 'Upcoming'),
-                Tab(text: 'Completed'),
-              ],
-            ),
-            // ── Status filter chips (Upcoming tab only) ───────────────
-            if (isUpcomingTab)
-              Container(
-                color: context.colors.background,
-                padding: const EdgeInsets.fromLTRB(0, 10, 0, 8),
-                child: SizedBox(
+            // ── Filter chips ──────────────────────────────────────────
+            Container(
+              color: context.colors.background,
+              padding: const EdgeInsets.fromLTRB(0, 4, 0, 8),
+              child: SizedBox(
                 height: 32,
                 child: ListView(
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 14),
-                  children: [
-                    _FilterChip(
-                      label: 'All',
-                      selected: _statusFilter == null,
-                      onTap: () => setState(() => _statusFilter = null),
-                    ),
-                    const SizedBox(width: 8),
-                    _FilterChip(
-                      label: 'Planning',
-                      selected: _statusFilter == 'planning',
-                      onTap: () => setState(() => _statusFilter = 'planning'),
-                    ),
-                    const SizedBox(width: 8),
-                    _FilterChip(
-                      label: 'In Progress',
-                      selected: _statusFilter == 'in_progress',
-                      onTap: () =>
-                          setState(() => _statusFilter = 'in_progress'),
-                    ),
-                  ],
+                  children: isUpcomingTab
+                      ? [
+                          _FilterChip(
+                            label: 'All',
+                            selected: _upcomingFilter == null,
+                            onTap: () =>
+                                setState(() => _upcomingFilter = null),
+                          ),
+                          const SizedBox(width: 8),
+                          _FilterChip(
+                            label: 'Planning',
+                            selected: _upcomingFilter == 'planning',
+                            onTap: () =>
+                                setState(() => _upcomingFilter = 'planning'),
+                          ),
+                          const SizedBox(width: 8),
+                          _FilterChip(
+                            label: 'In Progress',
+                            selected: _upcomingFilter == 'in_progress',
+                            onTap: () => setState(
+                                () => _upcomingFilter = 'in_progress'),
+                          ),
+                        ]
+                      : [
+                          _FilterChip(
+                            label: 'All',
+                            selected: _completedFilter == null,
+                            onTap: () =>
+                                setState(() => _completedFilter = null),
+                          ),
+                          const SizedBox(width: 8),
+                          _FilterChip(
+                            label: 'Completed',
+                            selected: _completedFilter == 'completed',
+                            onTap: () =>
+                                setState(() => _completedFilter = 'completed'),
+                          ),
+                          const SizedBox(width: 8),
+                          _FilterChip(
+                            label: 'Cancelled',
+                            selected: _completedFilter == 'cancelled',
+                            onTap: () =>
+                                setState(() => _completedFilter = 'cancelled'),
+                          ),
+                        ],
                 ),
               ),
             ),
@@ -157,9 +183,11 @@ class _MissionsScreenState extends State<MissionsScreen>
           _MissionList(
               filter: 'upcoming',
               query: _query,
-              statusFilter: _statusFilter),
+              statusFilter: _upcomingFilter),
           _MissionList(
-              filter: 'completed', query: _query, statusFilter: null),
+              filter: 'completed',
+              query: _query,
+              statusFilter: _completedFilter),
         ],
       ),
       floatingActionButton: context
@@ -310,8 +338,13 @@ class _MissionListState extends State<_MissionList> {
         emptyMsg = 'No missions match "${widget.query}".';
         emptyIcon = Icons.search_off_outlined;
       } else if (widget.statusFilter != null) {
-        final label =
-            widget.statusFilter == 'planning' ? 'Planning' : 'In Progress';
+        const labels = {
+          'planning':    'Planning',
+          'in_progress': 'In Progress',
+          'completed':   'Completed',
+          'cancelled':   'Cancelled',
+        };
+        final label = labels[widget.statusFilter] ?? widget.statusFilter!;
         emptyMsg = 'No $label missions.';
         emptyIcon = Icons.filter_list_off;
       } else if (widget.filter == 'upcoming') {
@@ -350,7 +383,7 @@ class _MissionListState extends State<_MissionList> {
       onRefresh: provider.refreshMissions,
       child: ListView.builder(
         controller: _scroll,
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
+        padding: const EdgeInsets.fromLTRB(14, 6, 14, 24),
         itemCount: missions.length + (provider.hasMoreMissions ? 1 : 0),
         itemBuilder: (ctx, i) {
           // "Loading more" indicator at the end of the list

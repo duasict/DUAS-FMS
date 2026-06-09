@@ -1,9 +1,10 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/flight_log.dart';
 import '../../database/database_helper.dart';
 import '../../providers/app_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/app_bar_title.dart';
 import '../checklists/checklist_widgets.dart';
 
 class FlightLogScreen extends StatefulWidget {
@@ -291,7 +292,7 @@ class _FlightLogScreenState extends State<FlightLogScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Flight Log & Report'),
+        title: const AppBarTitle(title: 'Flight Log & Report', subtitle: 'Sortie documentation'),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(52),
           child: Padding(

@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/app_bar_title.dart';
 
 /// Returns the approximate area of a closed geographic polygon in hectares.
 /// Uses the spherical excess formula (Chamberlain & Duquette 2007) — accurate
@@ -207,7 +208,7 @@ class _CoverageMapScreenState extends State<CoverageMapScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Draw Coverage Area'),
+        title: const AppBarTitle(title: 'Draw Coverage Area', subtitle: 'Polygon area of operation'),
         actions: [
           if (_pts.isNotEmpty)
             IconButton(

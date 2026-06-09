@@ -1,10 +1,11 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import '../../providers/org_settings_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/user_profile_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/app_bar_title.dart';
 import '../onboarding/org_setup_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -30,7 +31,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final isCrp = context.watch<UserProfileProvider>().profile.role == 'crp';
     final org   = context.watch<OrgSettingsProvider>();
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(title: const AppBarTitle(title: 'Settings', subtitle: 'Appearance & preferences')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
         children: [
@@ -216,6 +217,10 @@ class _ThemeToggleTile extends StatelessWidget {
           activeTrackColor: AppColors.primary.withValues(alpha: 0.3),
           inactiveThumbColor: AppColors.primaryLight,
           inactiveTrackColor: AppColors.primaryLight.withValues(alpha: 0.2),
+          trackOutlineColor: WidgetStateProperty.resolveWith((states) =>
+            states.contains(WidgetState.selected)
+                ? Colors.transparent
+                : context.colors.border),
         ),
         onTap: () => context.read<ThemeProvider>().toggle(),
         dense: true,

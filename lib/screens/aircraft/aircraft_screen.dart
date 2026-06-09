@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../models/aircraft.dart';
 import '../../providers/app_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/app_bar_title.dart';
 import 'aircraft_form_screen.dart';
 
 class AircraftScreen extends StatelessWidget {
@@ -13,7 +14,7 @@ class AircraftScreen extends StatelessWidget {
     final aircraft = context.watch<AppProvider>().aircraft;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Aircraft Fleet')),
+      appBar: AppBar(title: const AppBarTitle(title: 'Aircraft Fleet', subtitle: 'Registered fleet')),
       body: aircraft.isEmpty
           ? _emptyState(context)
           : ListView.builder(

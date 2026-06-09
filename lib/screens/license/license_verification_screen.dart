@@ -1,4 +1,4 @@
-import 'dart:io';
+﻿import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -13,6 +13,7 @@ import 'package:provider/provider.dart';
 import '../../providers/user_profile_provider.dart';
 import '../../services/face_recognition_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/app_bar_title.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  LicenseVerificationScreen
@@ -144,7 +145,7 @@ class _LicenseVerificationScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('License Verification'),
+        title: const AppBarTitle(title: 'License Verification', subtitle: 'CAAP Remote Pilot Certificate'),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(28),
           child: _stepIndicator(),

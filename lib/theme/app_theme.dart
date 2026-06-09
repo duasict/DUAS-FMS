@@ -1,54 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  Color palette — mapped from CSS design tokens
-//
-//  Primary scale  (a0 → a50: dark → light blue-violet)
-//    a0  #333aff   a10 #3f57ff   a20 #506fff
-//    a30 #6284ff   a40 #7797ff   a50 #8ca9ff
-//
-//  Surface scale  (a0 → a50: near-black → mid-gray)
-//    a0  #121212   a10 #252525   a20 #393939
-//    a30 #4f4f4f   a40 #666666   a50 #7d7d7d
-//
-//  Tonal surface  (a0 → a50: dark blue-black → mid blue-gray)
-//    a0  #141926   a10 #272c39   a20 #3b404c
-//    a30 #515560   a40 #676b75   a50 #7f828b
-//
-//  Semantic a0 = darkest  |  a10 = mid  |  a20 = lightest
-//    success   #22946e / #5ba989 / #86bfa6
-//    warning   #a87a2a / #ba945a / #cbae84
-//    danger    #9c2121 / #b4544c / #ca7f77
-//    info      #21498a / #4b6ca2 / #7590ba
-// ═══════════════════════════════════════════════════════════════════════════════
-
 // ── Semantic colors — immutable, same values in both themes ───────────────────
 class AppColors {
   AppColors._();
 
-  // Default primary scale — kept as compile-time constants so they can be used
-  // in const widget constructors.  Dynamic callers should prefer
-  // context.colors.primary / primaryLight / accent instead.
-  static const Color primary      = Color(0xFF333AFF);
-  static const Color primaryLight = Color(0xFF7797FF);
-  static const Color accent       = Color(0xFF8CA9FF);
+  // Primary — kept as compile-time constants for const widget constructors.
+  // Dynamic callers should prefer context.colors.primary / primaryLight / accent.
+  static const Color primary      = Color(0xFF3B44FF);
+  static const Color primaryLight = Color(0xFF5874FF);
+  static const Color accent       = Color(0xFF5874FF);
 
-  // Success (a10 for text/icons, a0 for solid backgrounds)
-  static const Color success      = Color(0xFF5BA989);
-  static const Color successDark  = Color(0xFF22946E);
+  // Semantic: main color (border/icon) + bg color (card fill)
+  static const Color success      = Color(0xFF7DFF95);
+  static const Color successBg    = Color(0xFFB8FFC1);
 
-  // Warning
-  static const Color warning      = Color(0xFFBA945A);
-  static const Color warningDark  = Color(0xFFA87A2A);
+  static const Color warning      = Color(0xFFFFBC5E);
+  static const Color warningBg    = Color(0xFFFFD8A4);
 
-  // Danger
-  static const Color danger       = Color(0xFFB4544C);
-  static const Color dangerDark   = Color(0xFF9C2121);
+  static const Color danger       = Color(0xFFFF8080);
+  static const Color dangerBg     = Color(0xFFFFB5B2);
 
-  // Info
-  static const Color info         = Color(0xFF4B6CA2);
-  static const Color infoDark     = Color(0xFF21498A);
+  static const Color info         = Color(0xFF87D1FF);
+  static const Color infoBg       = Color(0xFFB9E4FF);
 
 }
 
@@ -82,23 +56,23 @@ class AppColorScheme extends ThemeExtension<AppColorScheme> {
   // ── Dark palette ──────────────────────────────────────────────────────────
   static const dark = AppColorScheme(
     background:    Color(0xFF121212),
-    surface:       Color(0xFF141926),
-    card:          Color(0xFF272C39),
-    border:        Color(0xFF3B404C),
-    textPrimary:   Color(0xFFE4E6F0),
-    textSecondary: Color(0xFF7F828B),
-    textMuted:     Color(0xFF676B75),
+    surface:       Color(0xFF252525),
+    card:          Color(0xFF252525),
+    border:        Color(0xFF393939),
+    textPrimary:   Color(0xFFFFFFFF),
+    textSecondary: Color(0xFFC0C0C0),
+    textMuted:     Color(0xFF888888),
   );
 
   // ── Light palette ─────────────────────────────────────────────────────────
   static const light = AppColorScheme(
-    background:    Color(0xFFEEF0F7),
-    surface:       Color(0xFFFFFFFF),
-    card:          Color(0xFFFFFFFF),
-    border:        Color(0xFFD8DBE8),
-    textPrimary:   Color(0xFF141926),
-    textSecondary: Color(0xFF515560),
-    textMuted:     Color(0xFF676B75),
+    background:    Color(0xFFFFFFFF),
+    surface:       Color(0xFFF2F2F2),
+    card:          Color(0xFFF2F2F2),
+    border:        Color(0xFFE4E4E4),
+    textPrimary:   Color(0xFF000000),
+    textSecondary: Color(0xFF444444),
+    textMuted:     Color(0xFF777777),
   );
 
   @override
@@ -203,12 +177,14 @@ class AppTheme {
         backgroundColor: c.surface,
         foregroundColor: c.textPrimary,
         elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
         centerTitle: false,
         titleTextStyle: GoogleFonts.inter(
           color: c.textPrimary,
-          fontSize: 18,
+          fontSize: 20,
           fontWeight: FontWeight.w600,
-          letterSpacing: 0.3,
+          letterSpacing: 0.2,
         ),
         iconTheme: IconThemeData(color: c.textPrimary),
       ),

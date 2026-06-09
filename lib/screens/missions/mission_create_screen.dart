@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../database/database_helper.dart';
 import '../../models/aircraft.dart';
@@ -7,6 +7,7 @@ import '../../models/mission.dart';
 import '../../models/user_profile.dart';
 import '../../providers/app_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/app_bar_title.dart';
 import '../mission_details/mission_details_screen.dart';
 
 class MissionCreateScreen extends StatefulWidget {
@@ -227,7 +228,7 @@ class _MissionCreateScreenState extends State<MissionCreateScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('New Mission')),
+      appBar: AppBar(title: const AppBarTitle(title: 'New Mission', subtitle: 'Plan a new operation')),
       body: _isLoading
           ? const Center(
               child: CircularProgressIndicator(color: AppColors.primary))

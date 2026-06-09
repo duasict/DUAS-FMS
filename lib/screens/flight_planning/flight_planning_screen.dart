@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
@@ -6,6 +6,7 @@ import '../../database/database_helper.dart';
 import '../../models/flight_plan.dart';
 import '../../providers/app_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/app_bar_title.dart';
 import '../checklists/checklist_widgets.dart';
 import '../hira/hira_screen.dart';
 import '../shared/mission_flow_widgets.dart';
@@ -224,7 +225,7 @@ class _FlightPlanningScreenState extends State<FlightPlanningScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Flight Planning'),
+        title: const AppBarTitle(title: 'Flight Planning', subtitle: 'Route & coverage planning'),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(28),
           child: Padding(

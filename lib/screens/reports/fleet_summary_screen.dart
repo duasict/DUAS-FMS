@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../database/database_helper.dart';
 import '../../models/mission.dart';
@@ -6,6 +6,7 @@ import '../../providers/user_profile_provider.dart';
 import '../../services/org_settings_service.dart';
 import '../../services/pdf_generator_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/app_bar_title.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  FleetSummaryScreen  (CRP-only)
@@ -196,7 +197,7 @@ class _FleetSummaryScreenState extends State<FleetSummaryScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Fleet Summary'),
+        title: const AppBarTitle(title: 'Fleet Summary', subtitle: 'Aggregate stats & export'),
         actions: [
           if (_isExporting)
             const Padding(

@@ -1,7 +1,8 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/org_settings_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/app_bar_title.dart';
 
 class HelpDocumentationScreen extends StatelessWidget {
   const HelpDocumentationScreen({super.key});
@@ -10,7 +11,7 @@ class HelpDocumentationScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final appName = context.watch<OrgSettingsProvider>().appName;
     return Scaffold(
-      appBar: AppBar(title: const Text('Help & Documentation')),
+      appBar: AppBar(title: const AppBarTitle(title: 'Help & Documentation', subtitle: 'UAS SOP & app guide')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
         children: [
@@ -18,6 +19,7 @@ class HelpDocumentationScreen extends StatelessWidget {
           const SizedBox(height: 16),
           _Section(
             icon: Icons.rocket_launch_outlined,
+            color: AppColors.primaryLight,
             title: 'Getting Started',
             children: [
               _Entry(
@@ -49,6 +51,7 @@ class HelpDocumentationScreen extends StatelessWidget {
           ),
           _Section(
             icon: Icons.route_outlined,
+            color: AppColors.success,
             title: 'Mission Workflow',
             children: const [
               _Entry(
@@ -81,6 +84,7 @@ class HelpDocumentationScreen extends StatelessWidget {
           ),
           _Section(
             icon: Icons.shield_outlined,
+            color: AppColors.warning,
             title: 'HIRA — Risk Matrix',
             children: const [
               _Entry(
@@ -107,6 +111,7 @@ class HelpDocumentationScreen extends StatelessWidget {
           ),
           _Section(
             icon: Icons.wifi_tethering_outlined,
+            color: AppColors.info,
             title: 'P2P Offline Concurrence',
             children: const [
               _Entry(
@@ -129,6 +134,7 @@ class HelpDocumentationScreen extends StatelessWidget {
           ),
           _Section(
             icon: Icons.build_circle_outlined,
+            color: const Color(0xFFFF9E50),
             title: 'Maintenance & Records',
             children: const [
               _Entry(
@@ -154,6 +160,7 @@ class HelpDocumentationScreen extends StatelessWidget {
           ),
           _Section(
             icon: Icons.gavel_outlined,
+            color: const Color(0xFFCE93D8),
             title: 'Regulatory References',
             children: const [
               _Entry(
@@ -182,6 +189,7 @@ class HelpDocumentationScreen extends StatelessWidget {
           ),
           _Section(
             icon: Icons.help_center_outlined,
+            color: AppColors.danger,
             title: 'Troubleshooting',
             children: const [
               _Entry(
@@ -235,11 +243,13 @@ class HelpDocumentationScreen extends StatelessWidget {
 
 class _Section extends StatefulWidget {
   final IconData icon;
+  final Color color;
   final String title;
   final List<_Entry> children;
 
   const _Section({
     required this.icon,
+    required this.color,
     required this.title,
     required this.children,
   });
@@ -270,11 +280,11 @@ class _SectionState extends State<_Section> {
               Container(
                 padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
+                  color: widget.color.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child:
-                    Icon(widget.icon, color: AppColors.primaryLight, size: 17),
+                    Icon(widget.icon, color: widget.color, size: 17),
               ),
               const SizedBox(width: 12),
               Expanded(

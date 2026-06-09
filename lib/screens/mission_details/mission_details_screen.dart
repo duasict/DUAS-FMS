@@ -307,8 +307,23 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(m.missionId,
-            style: const TextStyle(fontFamily: 'monospace', fontSize: 16)),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(m.missionId,
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 16)),
+            Text(
+              m.title,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w400,
+                color: context.colors.textSecondary,
+                letterSpacing: 0,
+              ),
+            ),
+          ],
+        ),
         actions: [
           if (canEdit)
             IconButton(

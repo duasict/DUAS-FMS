@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../database/database_helper.dart';
@@ -10,6 +10,7 @@ import '../../services/p2p_concurrence_service.dart';
 import '../../services/supabase_service.dart';
 import '../../services/sync_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/app_bar_title.dart';
 import '../equipment_checklist/equipment_checklist_screen.dart';
 import '../shared/mission_flow_widgets.dart';
 
@@ -193,7 +194,7 @@ class _MissionApprovalScreenState extends State<MissionApprovalScreen> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Mission Approval')),
+        appBar: AppBar(title: const AppBarTitle(title: 'Mission Approval', subtitle: 'CRP concurrence review')),
         body: const Center(
             child: CircularProgressIndicator(color: AppColors.primary)),
       );
@@ -203,7 +204,7 @@ class _MissionApprovalScreenState extends State<MissionApprovalScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Mission Approval'),
+        title: const AppBarTitle(title: 'Mission Approval', subtitle: 'CRP concurrence review'),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(28),
           child: Padding(

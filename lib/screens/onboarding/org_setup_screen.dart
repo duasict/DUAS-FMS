@@ -1,4 +1,4 @@
-import 'dart:io';
+﻿import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../providers/org_settings_provider.dart';
 import '../../services/org_settings_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/app_bar_title.dart';
 import '../../widgets/org_logo.dart';
 import '../login_screen.dart';
 
@@ -113,7 +114,7 @@ class _OrgSetupScreenState extends State<OrgSetupScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: widget.editMode
-          ? AppBar(title: const Text('Organization Settings'))
+          ? AppBar(title: const AppBarTitle(title: 'Organization Settings', subtitle: 'White-label branding'))
           : null,
       body: SafeArea(
         child: SingleChildScrollView(

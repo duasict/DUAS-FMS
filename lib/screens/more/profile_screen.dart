@@ -1,4 +1,4 @@
-import 'dart:io';
+﻿import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../models/user_profile.dart';
 import '../../providers/user_profile_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/app_bar_title.dart';
 import '../license/license_verification_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -189,7 +190,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Profile'),
+        title: const AppBarTitle(title: 'My Profile', subtitle: 'Personal info & role'),
         actions: [
           if (_isDirty)
             TextButton(
@@ -592,7 +593,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(height: 14),
           SizedBox(
             width: double.infinity,
-            height: 40,
             child: ElevatedButton.icon(
               onPressed: () => Navigator.push(
                 context,
@@ -606,6 +606,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10)),
               ),

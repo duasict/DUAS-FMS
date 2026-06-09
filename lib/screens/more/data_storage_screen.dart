@@ -1,8 +1,9 @@
-import 'package:connectivity_plus/connectivity_plus.dart';
+﻿import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import '../../database/database_helper.dart';
 import '../../services/sync_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/app_bar_title.dart';
 
 class DataStorageScreen extends StatefulWidget {
   const DataStorageScreen({super.key});
@@ -100,7 +101,7 @@ class _DataStorageScreenState extends State<DataStorageScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Data & Storage'),
+        title: const AppBarTitle(title: 'Data & Storage', subtitle: 'Local data & sync'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),

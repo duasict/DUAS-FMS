@@ -180,9 +180,24 @@ class _MissionEditScreenState extends State<MissionEditScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          'Edit  ${widget.mission.missionId}',
-          style: const TextStyle(fontFamily: 'monospace', fontSize: 15),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Edit  ${widget.mission.missionId}',
+              style: const TextStyle(fontFamily: 'monospace', fontSize: 15),
+            ),
+            Text(
+              'Update mission details',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w400,
+                color: context.colors.textSecondary,
+                letterSpacing: 0,
+              ),
+            ),
+          ],
         ),
         actions: [
           if (_isSaving)

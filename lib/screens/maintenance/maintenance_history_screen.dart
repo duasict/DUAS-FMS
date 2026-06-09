@@ -1,9 +1,10 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../../database/database_helper.dart';
 import '../../models/aircraft.dart';
 import '../../services/org_settings_service.dart';
 import '../../services/pdf_generator_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/app_bar_title.dart';
 import 'maintenance_log_screen.dart';
 
 class MaintenanceHistoryScreen extends StatefulWidget {
@@ -124,7 +125,7 @@ class _MaintenanceHistoryScreenState extends State<MaintenanceHistoryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Maintenance Log'),
+        title: const AppBarTitle(title: 'Maintenance Log', subtitle: 'Airframe maintenance records'),
         actions: [
           if (_logs.isNotEmpty)
             _exportingId == -1
@@ -189,6 +190,7 @@ class _MaintenanceHistoryScreenState extends State<MaintenanceHistoryScreen> {
                   ),
                 ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: null,
         onPressed: () async {
           await Navigator.push(
             context,
@@ -198,7 +200,7 @@ class _MaintenanceHistoryScreenState extends State<MaintenanceHistoryScreen> {
         },
         icon: const Icon(Icons.add, size: 20),
         label: const Text('New Log'),
-        backgroundColor: AppColors.primary,
+        backgroundColor: AppColors.accent,
         foregroundColor: Colors.white,
       ),
     );

@@ -99,7 +99,22 @@ class _BaseChecklistScreenState extends State<BaseChecklistScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_titleFor(widget.checklistType)),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(_titleFor(widget.checklistType)),
+            Text(
+              'Annex A compliance checklist',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w400,
+                color: context.colors.textSecondary,
+                letterSpacing: 0,
+              ),
+            ),
+          ],
+        ),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(52),
           child: Padding(

@@ -1,6 +1,7 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/app_bar_title.dart';
 
 /// Keys used throughout the app to gate notification delivery.
 class NotifPrefs {
@@ -66,7 +67,7 @@ class _NotificationPreferencesScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Notification Preferences')),
+      appBar: AppBar(title: const AppBarTitle(title: 'Notification Preferences', subtitle: 'Manage alert settings')),
       body: _loaded
           ? ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),

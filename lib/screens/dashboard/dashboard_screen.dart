@@ -83,31 +83,31 @@ class DashboardScreen extends StatelessWidget {
                     children: [
                       StatCard(
                         label: 'Total Missions',
-                        value:
-                            '${provider.stats['missions'] ?? 0}',
+                        value: '${provider.stats['missions'] ?? 0}',
                         icon: Icons.flight_takeoff,
-                        color: AppColors.primary,
+                        color: AppColors.info,
+                        bgColor: AppColors.infoBg,
                       ),
                       StatCard(
                         label: 'Aircraft',
-                        value:
-                            '${provider.stats['aircraft'] ?? 0}',
+                        value: '${provider.stats['aircraft'] ?? 0}',
                         icon: Icons.air,
-                        color: AppColors.accent,
+                        color: AppColors.danger,
+                        bgColor: AppColors.dangerBg,
                       ),
                       StatCard(
                         label: 'Pending Concurrences',
-                        value:
-                            '${provider.stats['pendingConcurrences'] ?? 0}',
+                        value: '${provider.stats['pendingConcurrences'] ?? 0}',
                         icon: Icons.pending_actions,
                         color: AppColors.warning,
+                        bgColor: AppColors.warningBg,
                       ),
                       StatCard(
                         label: 'Total Flight Hours',
-                        value:
-                            '${provider.stats['totalFlightHours'] ?? 0}h',
+                        value: '${provider.stats['totalFlightHours'] ?? 0}h',
                         icon: Icons.timer_outlined,
                         color: AppColors.success,
+                        bgColor: AppColors.successBg,
                       ),
                     ],
                   ),

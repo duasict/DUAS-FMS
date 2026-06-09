@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../database/database_helper.dart';
 import '../../services/sync_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/app_bar_title.dart';
 
 class IncidentReportScreen extends StatefulWidget {
   const IncidentReportScreen({super.key});
@@ -135,7 +136,7 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Incident Report')),
+      appBar: AppBar(title: const AppBarTitle(title: 'Incident Report', subtitle: 'File a CAAP incident report')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
         children: [

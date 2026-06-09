@@ -1,10 +1,11 @@
-import 'dart:io';
+﻿import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/user_profile.dart';
 import '../../providers/user_profile_provider.dart';
 import '../../services/supabase_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/app_bar_title.dart';
 import '../aircraft/aircraft_screen.dart';
 import '../battery/battery_history_screen.dart';
 import '../incidents/incident_history_screen.dart';
@@ -28,7 +29,7 @@ class MoreScreen extends StatelessWidget {
     final profile = context.watch<UserProfileProvider>().profile;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('More')),
+      appBar: AppBar(title: const AppBarTitle(title: 'More', subtitle: 'Account, settings & records')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         children: [
@@ -105,6 +106,7 @@ class MoreScreen extends StatelessWidget {
             icon: Icons.person_outline,
             title: 'Profile',
             subtitle: 'Edit your personal information',
+            iconColor: const Color(0xFFFF80AB),
             onTap: () => Navigator.push(context,
                 MaterialPageRoute(builder: (_) => const ProfileScreen())),
           ),
@@ -125,6 +127,7 @@ class MoreScreen extends StatelessWidget {
             icon: Icons.air,
             title: 'Aircraft Fleet',
             subtitle: 'Manage and register aircraft',
+            iconColor: const Color(0xFF80D8FF),
             onTap: () => Navigator.push(context,
                 MaterialPageRoute(builder: (_) => const AircraftScreen())),
           ),
@@ -132,6 +135,7 @@ class MoreScreen extends StatelessWidget {
             icon: Icons.settings_outlined,
             title: 'Settings',
             subtitle: 'Appearance and app preferences',
+            iconColor: const Color(0xFF82B1FF),
             onTap: () => Navigator.push(context,
                 MaterialPageRoute(builder: (_) => const SettingsScreen())),
           ),
@@ -139,6 +143,7 @@ class MoreScreen extends StatelessWidget {
             icon: Icons.notifications_outlined,
             title: 'Notification Preferences',
             subtitle: 'Manage alert settings',
+            iconColor: const Color(0xFFFFD180),
             onTap: () => Navigator.push(context,
                 MaterialPageRoute(
                     builder: (_) => const NotificationPreferencesScreen())),
@@ -147,6 +152,7 @@ class MoreScreen extends StatelessWidget {
             icon: Icons.storage_outlined,
             title: 'Data & Storage',
             subtitle: 'Local storage and sync settings',
+            iconColor: const Color(0xFF64FFDA),
             onTap: () => Navigator.push(context,
                 MaterialPageRoute(
                     builder: (_) => const DataStorageScreen())),
@@ -157,6 +163,7 @@ class MoreScreen extends StatelessWidget {
             icon: Icons.build_outlined,
             title: 'Maintenance Log',
             subtitle: 'View history and log airframe maintenance',
+            iconColor: const Color(0xFFFF9E50),
             onTap: () => Navigator.push(context,
                 MaterialPageRoute(builder: (_) => const MaintenanceHistoryScreen())),
           ),
@@ -164,6 +171,7 @@ class MoreScreen extends StatelessWidget {
             icon: Icons.battery_charging_full,
             title: 'Battery Log',
             subtitle: 'View history and track battery cycles',
+            iconColor: AppColors.success,
             onTap: () => Navigator.push(context,
                 MaterialPageRoute(builder: (_) => const BatteryHistoryScreen())),
           ),
@@ -180,7 +188,7 @@ class MoreScreen extends StatelessWidget {
               icon: Icons.bar_chart_outlined,
               title: 'Fleet Summary',
               subtitle: 'Aggregate stats and PDF export',
-              iconColor: AppColors.success,
+              iconColor: const Color(0xFFA78BFA),
               onTap: () => Navigator.push(context,
                   MaterialPageRoute(
                       builder: (_) => const FleetSummaryScreen())),
@@ -191,6 +199,7 @@ class MoreScreen extends StatelessWidget {
             icon: Icons.help_outline,
             title: 'Help & Documentation',
             subtitle: 'UAS SOP and app guide',
+            iconColor: const Color(0xFFCCFF90),
             onTap: () => Navigator.push(context,
                 MaterialPageRoute(
                     builder: (_) => const HelpDocumentationScreen())),
@@ -199,6 +208,7 @@ class MoreScreen extends StatelessWidget {
             icon: Icons.info_outline,
             title: 'About',
             subtitle: 'UAS FMS v1.0.0',
+            iconColor: const Color(0xFFCE93D8),
             onTap: () => Navigator.push(context,
                 MaterialPageRoute(builder: (_) => const AboutScreen())),
           ),

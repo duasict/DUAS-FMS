@@ -1,8 +1,9 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../../database/database_helper.dart';
 import '../../services/org_settings_service.dart';
 import '../../services/pdf_generator_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/app_bar_title.dart';
 import 'battery_log_screen.dart';
 
 class BatteryHistoryScreen extends StatefulWidget {
@@ -91,7 +92,7 @@ class _BatteryHistoryScreenState extends State<BatteryHistoryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Battery Log'),
+        title: const AppBarTitle(title: 'Battery Log', subtitle: 'Battery cycle records'),
         actions: [
           if (_logs.isNotEmpty)
             _exportingId == -1
@@ -155,6 +156,7 @@ class _BatteryHistoryScreenState extends State<BatteryHistoryScreen> {
                   ),
                 ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: null,
         onPressed: () async {
           await Navigator.push(
             context,
@@ -164,7 +166,7 @@ class _BatteryHistoryScreenState extends State<BatteryHistoryScreen> {
         },
         icon: const Icon(Icons.add, size: 20),
         label: const Text('New Log'),
-        backgroundColor: AppColors.primary,
+        backgroundColor: AppColors.accent,
         foregroundColor: Colors.white,
       ),
     );

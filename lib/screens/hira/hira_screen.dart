@@ -1,10 +1,11 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../database/database_helper.dart';
 import '../../models/hira_row.dart';
 import '../../providers/app_provider.dart';
 import '../../services/notification_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/app_bar_title.dart';
 import '../checklists/checklist_widgets.dart';
 import '../equipment_checklist/equipment_checklist_screen.dart';
 import '../mission_approval/mission_approval_screen.dart';
@@ -161,7 +162,7 @@ class _HiraScreenState extends State<HiraScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('HIRA & Risk Assessment'),
+        title: const AppBarTitle(title: 'HIRA & Risk Assessment', subtitle: 'Hazard identification & risk'),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(28),
           child: Padding(

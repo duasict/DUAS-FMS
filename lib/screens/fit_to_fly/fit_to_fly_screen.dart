@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../database/database_helper.dart';
 import '../../utils/app_constants.dart';
@@ -6,6 +6,7 @@ import '../../models/checklist_item.dart';
 import '../../models/crew_member.dart';
 import '../../providers/app_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/app_bar_title.dart';
 import '../../widgets/checklist_tile.dart';
 import '../checklists/checklist_widgets.dart';
 import '../checklists/preflight_checklist_screen.dart';
@@ -184,7 +185,7 @@ class _FitToFlyScreenState extends State<FitToFlyScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Fit-to-Fly Clearance'),
+        title: const AppBarTitle(title: 'Fit-to-Fly Clearance', subtitle: 'Pre-mission crew fitness'),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(36),
           child: Padding(

@@ -145,7 +145,22 @@ class _AircraftFormScreenState extends State<AircraftFormScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isEdit ? 'Edit Aircraft' : 'New Aircraft'),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(_isEdit ? 'Edit Aircraft' : 'New Aircraft'),
+            Text(
+              _isEdit ? 'Edit aircraft details' : 'Register a new airframe',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w400,
+                color: context.colors.textSecondary,
+                letterSpacing: 0,
+              ),
+            ),
+          ],
+        ),
         actions: [
           if (_isEdit)
             IconButton(

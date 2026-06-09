@@ -17,27 +17,42 @@ class AlertsScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Row(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Alerts'),
-            if (unread > 0) ...[
-              const SizedBox(width: 10),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: AppColors.danger.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  '$unread unread',
-                  style: TextStyle(
-                      color: AppColors.danger,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600),
-                ),
+            Row(
+              children: [
+                const Text('Alerts'),
+                if (unread > 0) ...[
+                  const SizedBox(width: 10),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.danger.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '$unread unread',
+                      style: TextStyle(
+                          color: AppColors.danger,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            Text(
+              'Notifications & concurrences',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w400,
+                color: context.colors.textSecondary,
+                letterSpacing: 0,
               ),
-            ],
+            ),
           ],
         ),
       ),
@@ -63,6 +78,16 @@ class AlertsScreen extends StatelessWidget {
   }
 }
 
+Color _alertColor(AlertModel alert) {
+  if (alert.isConcurrence) {
+    if (alert.status == 'approved') return AppColors.success;
+    if (alert.status == 'rejected') return AppColors.danger;
+    return AppColors.warning;
+  }
+  if (alert.title.toLowerCase().contains('completed')) return AppColors.success;
+  return AppColors.info;
+}
+
 class _AlertTile extends StatelessWidget {
   final AlertModel alert;
   const _AlertTile({required this.alert});
@@ -71,8 +96,7 @@ class _AlertTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final isConcurrence = alert.isConcurrence;
     final isPending = alert.isPending;
-    final accentColor =
-        isConcurrence ? AppColors.warning : AppColors.primaryLight;
+    final accentColor = _alertColor(alert);
 
     return Container(
       margin: EdgeInsets.symmetric(vertical: 5),
@@ -294,8 +318,7 @@ class _AlertDetailSheetState extends State<_AlertDetailSheet> {
   Widget build(BuildContext context) {
     final alert = widget.alert;
     final isConcurrence = alert.isConcurrence;
-    final accentColor =
-        isConcurrence ? AppColors.warning : AppColors.primaryLight;
+    final accentColor = _alertColor(alert);
 
     return DraggableScrollableSheet(
       expand: false,

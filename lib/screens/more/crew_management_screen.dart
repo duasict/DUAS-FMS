@@ -1,9 +1,10 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../providers/user_profile_provider.dart';
 import '../../services/supabase_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/app_bar_title.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  CrewManagementScreen  (CRP-only)
@@ -225,7 +226,7 @@ class _CrewManagementScreenState extends State<CrewManagementScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Crew Management'),
+        title: const AppBarTitle(title: 'Crew Management', subtitle: 'Org members & roles'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),

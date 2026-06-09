@@ -261,7 +261,22 @@ class _MissionReportsScreenState
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('${m.missionId} — Reports'),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('${m.missionId} — Reports'),
+            Text(
+              'Documents & compliance reports',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w400,
+                color: context.colors.textSecondary,
+                letterSpacing: 0,
+              ),
+            ),
+          ],
+        ),
         actions: [
           if (_loaded && _anyAvailable && _generating == null)
             TextButton.icon(

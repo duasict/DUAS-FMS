@@ -46,7 +46,7 @@ class AppProvider extends ChangeNotifier {
     ..sort((a, b) => a.date.compareTo(b.date));
 
   List<Mission> get completedMissions =>
-      _missions.where((m) => m.isCompleted).toList()
+      _missions.where((m) => m.isCompleted || m.isCancelled).toList()
         ..sort((a, b) => b.date.compareTo(a.date));
 
   int get unreadAlertCount => _alerts.where((a) => !a.isRead).length;

@@ -3,6 +3,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import '../../providers/org_settings_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/app_bar_title.dart';
 import '../../widgets/org_logo.dart';
 
 class AboutScreen extends StatefulWidget {
@@ -34,7 +35,7 @@ class _AboutScreenState extends State<AboutScreen> {
     final org = context.watch<OrgSettingsProvider>();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('About')),
+      appBar: AppBar(title: const AppBarTitle(title: 'About', subtitle: 'DUAS FMS v1.0.0')),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 24, 16, 40),
         children: [

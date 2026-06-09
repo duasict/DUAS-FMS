@@ -1,10 +1,11 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../../database/database_helper.dart';
 import '../../models/aircraft.dart';
 import '../../services/org_settings_service.dart';
 import '../../services/pdf_generator_service.dart';
 import '../../services/sync_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/app_bar_title.dart';
 
 class MaintenanceLogScreen extends StatefulWidget {
   const MaintenanceLogScreen({super.key});
@@ -189,7 +190,7 @@ class _MaintenanceLogScreenState extends State<MaintenanceLogScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Maintenance Log'),
+        title: const AppBarTitle(title: 'Maintenance Log', subtitle: 'Log a maintenance action'),
         actions: [
           if (_isExporting)
             const Padding(
