@@ -119,11 +119,15 @@ class _OrgSetupScreenState extends State<OrgSetupScreen> {
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(28, 32, 28, 48),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: MediaQuery.of(context).size.height,
+            ),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                 if (!widget.editMode) ...[
                   Row(children: [
                     Container(
@@ -312,7 +316,8 @@ class _OrgSetupScreenState extends State<OrgSetupScreen> {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 
   Widget _sectionLabel(BuildContext context, String text) => Padding(

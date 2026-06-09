@@ -1,6 +1,8 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:convert';
+import 'package:flutter/material.dart';
 import '../../database/database_helper.dart';
 import '../../models/aircraft.dart';
+import '../../widgets/photo_picker_field.dart';
 import '../../services/org_settings_service.dart';
 import '../../services/pdf_generator_service.dart';
 import '../../services/sync_service.dart';
@@ -28,6 +30,7 @@ class _MaintenanceLogScreenState extends State<MaintenanceLogScreen> {
   DateTime? _nextMaintenanceDate;
   String _maintenanceType = 'scheduled';
   String _airworthinessStatus = 'serviceable';
+  List<String> _photoPaths = [];
   bool _isLoading = true;
   bool _isSaving = false;
   bool _isExporting = false;  // true while generating A-9 PDF
@@ -109,6 +112,8 @@ class _MaintenanceLogScreenState extends State<MaintenanceLogScreen> {
       return;
     }
 
+    final profile = await DatabaseHelper.instance.getUserProfile();
+    final orgId = profile?.organizationId ?? '';
     setState(() => _isSaving = true);
     await DatabaseHelper.instance.insertMaintenanceLog({
       'aircraft_id': _selectedAircraftId,
@@ -122,7 +127,8 @@ class _MaintenanceLogScreenState extends State<MaintenanceLogScreen> {
       'airworthiness_status': _airworthinessStatus,
       'signed_by': _signedByCtrl.text.trim(),
       'remarks': _remarksCtrl.text.trim(),
-      'organization_id': '',
+      'photo_paths': jsonEncode(_photoPaths),
+      'organization_id': orgId,
       'created_at': DateTime.now().toIso8601String(),
       'is_synced': 0,
     });
@@ -139,11 +145,14 @@ class _MaintenanceLogScreenState extends State<MaintenanceLogScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(online ? 'Saved to cloud ✓' : 'Saved locally — syncs when online'),
+        content: Text(online
+            ? 'Saved — syncing to cloud in background'
+            : 'Saved locally — syncs when online'),
         backgroundColor: online ? AppColors.success : AppColors.warning,
         duration: const Duration(seconds: 3),
       ),
     );
+    if (online) SyncService.syncToCloud().catchError((_) => false);
   }
 
   // ── Export Annex A-9 PDF ────────────────────────────────────────────────────
@@ -261,6 +270,11 @@ class _MaintenanceLogScreenState extends State<MaintenanceLogScreen> {
                   _field(_signedByCtrl, 'Signed By *'),
                   const SizedBox(height: 10),
                   _field(_remarksCtrl, 'Remarks (optional)', maxLines: 2),
+                  const SizedBox(height: 14),
+                  PhotoPickerField(
+                    paths: _photoPaths,
+                    onChanged: (v) => setState(() => _photoPaths = v),
+                  ),
                 ]),
               ],
             ),
@@ -357,6 +371,11 @@ class _MaintenanceLogScreenState extends State<MaintenanceLogScreen> {
     );
   }
 
+  String _toLabel(String s) => s
+      .split(RegExp(r'[_\-]'))
+      .map((w) => w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1)}')
+      .join(' ');
+
   Widget _dropdownStr({required String label, required String value, required List<String> items, required ValueChanged<String?> onChanged}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -365,7 +384,7 @@ class _MaintenanceLogScreenState extends State<MaintenanceLogScreen> {
         value: value, isExpanded: true, underline: const SizedBox(),
         dropdownColor: context.colors.card,
         style: TextStyle(color: context.colors.textPrimary, fontSize: 13),
-        items: items.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+        items: items.map((s) => DropdownMenuItem(value: s, child: Text(_toLabel(s)))).toList(),
         onChanged: onChanged,
       ),
     );

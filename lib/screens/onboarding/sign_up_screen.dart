@@ -144,7 +144,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+          padding: const EdgeInsets.symmetric(horizontal: 28),
           child: _success ? _buildSuccess(context) : _buildForm(context, org),
         ),
       ),
@@ -152,42 +152,51 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 
   Widget _buildForm(BuildContext context, OrgSettingsProvider org) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 40),
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        minHeight: MediaQuery.of(context).size.height,
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
 
         // Branding header
-        Row(children: [
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(16),
-              border:
-                  Border.all(color: AppColors.primary.withValues(alpha: 0.35)),
-            ),
-            child:
-                const Icon(Icons.air, color: AppColors.primary, size: 36),
-          ),
-          const SizedBox(width: 16),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        Center(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Text(org.appName,
-                  style: TextStyle(
-                      color: context.colors.textPrimary,
-                      fontSize: 30,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: -0.5)),
-              Text(org.tagline,
-                  style: TextStyle(
-                      color: context.colors.textSecondary,
-                      fontSize: 13,
-                      letterSpacing: 0.3)),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(16),
+                  border:
+                      Border.all(color: AppColors.primary.withValues(alpha: 0.35)),
+                ),
+                child:
+                    const Icon(Icons.air, color: AppColors.primary, size: 36),
+              ),
+              const SizedBox(width: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(org.appName,
+                      style: TextStyle(
+                          color: context.colors.textPrimary,
+                          fontSize: 30,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: -0.5)),
+                  Text(org.tagline,
+                      style: TextStyle(
+                          color: context.colors.textSecondary,
+                          fontSize: 13,
+                          letterSpacing: 0.3)),
+                ],
+              ),
             ],
           ),
-        ]),
+        ),
 
         const SizedBox(height: 40),
         Text('Create Account',
@@ -323,6 +332,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
           ),
         ]),
       ],
+      ),
     );
   }
 

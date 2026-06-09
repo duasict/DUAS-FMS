@@ -1,8 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../database/database_helper.dart';
 import '../../services/sync_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_bar_title.dart';
+import '../../widgets/photo_picker_field.dart';
 
 class IncidentReportScreen extends StatefulWidget {
   const IncidentReportScreen({super.key});
@@ -23,6 +25,7 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
   TimeOfDay? _incidentTime;
   String _incidentType = 'near_miss';
   String _severity = 'minor';
+  List<String> _photoPaths = [];
   bool _reportedToCaap = false;
   bool _isSaving = false;
 
@@ -96,6 +99,8 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
       return;
     }
 
+    final profile = await DatabaseHelper.instance.getUserProfile();
+    final orgId = profile?.organizationId ?? '';
     setState(() => _isSaving = true);
     await DatabaseHelper.instance.insertIncidentReport({
       'incident_date': _formatDate(_incidentDate),
@@ -109,7 +114,8 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
       'corrective_actions': _correctiveActionsCtrl.text.trim(),
       'reported_to_caap': _reportedToCaap ? 1 : 0,
       'caap_reference': _reportedToCaap ? _caapRefCtrl.text.trim() : null,
-      'organization_id': '',
+      'photo_paths': jsonEncode(_photoPaths),
+      'organization_id': orgId,
       'created_at': DateTime.now().toIso8601String(),
       'is_synced': 0,
     });
@@ -126,11 +132,14 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(online ? 'Saved to cloud ✓' : 'Saved locally — syncs when online'),
+        content: Text(online
+            ? 'Saved — syncing to cloud in background'
+            : 'Saved locally — syncs when online'),
         backgroundColor: online ? AppColors.success : AppColors.warning,
         duration: const Duration(seconds: 3),
       ),
     );
+    if (online) SyncService.syncToCloud().catchError((_) => false);
   }
 
   @override
@@ -193,6 +202,12 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
               const SizedBox(height: 10),
               _field(_caapRefCtrl, 'CAAP Reference Number', hint: 'e.g. CAAP-2025-001'),
             ],
+          ]),
+          _section('PHOTOS', Icons.photo_library_outlined, [
+            PhotoPickerField(
+              paths: _photoPaths,
+              onChanged: (v) => setState(() => _photoPaths = v),
+            ),
           ]),
         ],
       ),
@@ -290,6 +305,11 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
     );
   }
 
+  String _toLabel(String s) => s
+      .split(RegExp(r'[_\-]'))
+      .map((w) => w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1)}')
+      .join(' ');
+
   Widget _dropdownStr({required String label, required String value, required List<String> items, required ValueChanged<String?> onChanged}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -298,7 +318,7 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
         value: value, isExpanded: true, underline: const SizedBox(),
         dropdownColor: context.colors.card,
         style: TextStyle(color: context.colors.textPrimary, fontSize: 13),
-        items: items.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+        items: items.map((s) => DropdownMenuItem(value: s, child: Text(_toLabel(s)))).toList(),
         onChanged: onChanged,
       ),
     );

@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../database/database_helper.dart';
 import '../models/mission.dart';
@@ -72,16 +74,24 @@ class SyncService {
       // marked as synced locally.
       final db = DatabaseHelper.instance;
       final dbRaw = await db.database;
-      bool maintSynced = false, battSynced = false, incSynced = false;
+      var maintSyncedIds = <int>[], incSyncedIds = <int>[];
+      bool battSynced = false;
 
       try {
         final rows = await dbRaw
             .rawQuery('SELECT * FROM maintenance_logs WHERE is_synced = 0');
         if (rows.isNotEmpty) {
-          await SupabaseService.upsertMaintenanceLogs(
-              rows.map((r) => _cleanLogRow(r, orgId)).toList());
+          final uploaded = await Future.wait(
+              rows.map((r) => _uploadPhotosInRow(r, 'maintenance')));
+          // Only push rows where every photo upload succeeded; rows with
+          // remaining local paths stay is_synced=0 and retry next cycle.
+          final ready = uploaded.where((r) => !_hasLocalPhotoPaths(r)).toList();
+          if (ready.isNotEmpty) {
+            await SupabaseService.upsertMaintenanceLogs(
+                ready.map((r) => _cleanLogRow(r, orgId)).toList());
+            maintSyncedIds = ready.map((r) => r['id'] as int).toList();
+          }
         }
-        maintSynced = true;
       } catch (e, st) {
         debugPrint('[SyncService] maintenance_logs sync error: $e\n$st');
       }
@@ -102,27 +112,38 @@ class SyncService {
         final rows = await dbRaw
             .rawQuery('SELECT * FROM incident_reports WHERE is_synced = 0');
         if (rows.isNotEmpty) {
-          await SupabaseService.upsertIncidentReports(
-              rows.map((r) => _cleanLogRow(r, orgId)).toList());
+          final uploaded = await Future.wait(
+              rows.map((r) => _uploadPhotosInRow(r, 'incidents')));
+          final ready = uploaded.where((r) => !_hasLocalPhotoPaths(r)).toList();
+          if (ready.isNotEmpty) {
+            await SupabaseService.upsertIncidentReports(
+                ready.map((r) => _cleanLogRow(r, orgId)).toList());
+            incSyncedIds = ready.map((r) => r['id'] as int).toList();
+          }
         }
-        incSynced = true;
       } catch (e, st) {
         debugPrint('[SyncService] incident_reports sync error: $e\n$st');
       }
 
-      // Mark only the tables whose upload succeeded as synced.
+      // Mark only fully-uploaded rows as synced. Maintenance and incident rows
+      // are tracked by ID so that any row whose photo upload failed remains
+      // is_synced=0 and will be retried on the next sync cycle.
       final batch = dbRaw.batch();
-      if (maintSynced) {
-        batch.update('maintenance_logs', {'is_synced': 1},
-            where: 'is_synced = 0');
+      if (maintSyncedIds.isNotEmpty) {
+        final ph = List.filled(maintSyncedIds.length, '?').join(',');
+        batch.rawUpdate(
+            'UPDATE maintenance_logs SET is_synced = 1 WHERE id IN ($ph)',
+            maintSyncedIds);
       }
       if (battSynced) {
         batch.update('battery_logs', {'is_synced': 1},
             where: 'is_synced = 0');
       }
-      if (incSynced) {
-        batch.update('incident_reports', {'is_synced': 1},
-            where: 'is_synced = 0');
+      if (incSyncedIds.isNotEmpty) {
+        final ph = List.filled(incSyncedIds.length, '?').join(',');
+        batch.rawUpdate(
+            'UPDATE incident_reports SET is_synced = 1 WHERE id IN ($ph)',
+            incSyncedIds);
       }
       await batch.commit(noResult: true);
 
@@ -158,6 +179,70 @@ class SyncService {
       if (m.containsKey(k)) m[k] = null;
     }
     m['organization_id'] = orgId;
+    return m;
+  }
+
+  // ── Photo upload helpers ──────────────────────────────────────────────────
+
+  static bool _isLocalPath(String p) =>
+      p.startsWith('/') || (p.length > 2 && p[1] == ':');
+
+  /// Returns true when a row's photo_paths JSON still contains at least one
+  /// local file path, meaning one or more uploads failed and the row should
+  /// not be marked as synced yet.
+  static bool _hasLocalPhotoPaths(Map<String, dynamic> row) {
+    final raw = row['photo_paths'];
+    if (raw == null || raw.toString().isEmpty) return false;
+    try {
+      return List<String>.from(jsonDecode(raw as String)).any(_isLocalPath);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Uploads a single local file to the `uas-photos` bucket.
+  /// Returns the storage path on success, null on failure.
+  static Future<String?> uploadPhoto(String localPath, String folder) async {
+    try {
+      final file = File(localPath);
+      if (!await file.exists()) return null;
+      final ext = localPath.split('.').last.toLowerCase();
+      final name =
+          '$folder/${DateTime.now().millisecondsSinceEpoch}_${localPath.hashCode.abs()}.$ext';
+      await Supabase.instance.client.storage
+          .from('uas-photos')
+          .upload(name, file, fileOptions: const FileOptions(upsert: false));
+      return name;
+    } catch (e) {
+      debugPrint('[SyncService] photo upload failed for $localPath: $e');
+      return null;
+    }
+  }
+
+  /// Returns a 1-hour signed URL for a storage path from the `uas-photos` bucket.
+  static Future<String> getPhotoUrl(String storagePath) =>
+      Supabase.instance.client.storage
+          .from('uas-photos')
+          .createSignedUrl(storagePath, 3600);
+
+  /// Replaces local file paths in a row's `photo_paths` JSON with storage paths.
+  static Future<Map<String, dynamic>> _uploadPhotosInRow(
+      Map<String, dynamic> row, String folder) async {
+    final m = Map<String, dynamic>.from(row);
+    final raw = m['photo_paths'];
+    if (raw == null || raw.toString().isEmpty) return m;
+    try {
+      final paths = List<String>.from(jsonDecode(raw as String));
+      final uploaded = <String>[];
+      for (final p in paths) {
+        if (_isLocalPath(p)) {
+          uploaded.add(await uploadPhoto(p, folder) ?? p);
+        } else {
+          uploaded.add(p);
+        }
+      }
+      m['photo_paths'] = jsonEncode(uploaded);
+    } catch (_) {}
     return m;
   }
 
@@ -297,6 +382,11 @@ class SyncService {
     final fl =
         await DatabaseHelper.instance.getFlightLogByMissionId(localId);
     if (fl != null) {
+      final flPhotoPaths = <String>[];
+      for (final p in fl.photoPaths) {
+        flPhotoPaths.add(
+            _isLocalPath(p) ? (await uploadPhoto(p, 'flight-logs') ?? p) : p);
+      }
       await SupabaseService.upsertFlightLog({
         'mission_id': missionUuid,
         'date_time': fl.dateTime,
@@ -329,6 +419,7 @@ class SyncService {
         if (fl.dataCapturedVideo != null)
           'data_video': fl.dataCapturedVideo,
         'data_lidar': fl.dataCapturedLidar,
+        'photo_paths': jsonEncode(flPhotoPaths),
         'next_maintenance': fl.nextMaintenance,
         'organization_id': orgId,
       });

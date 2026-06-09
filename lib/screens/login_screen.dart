@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../database/database_helper.dart';
 import '../models/user_profile.dart';
@@ -25,6 +26,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordCtrl = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
+  bool _rememberMe = true;
   String? _errorMessage;
   String _appVersion = '';
 
@@ -33,6 +35,8 @@ class _LoginScreenState extends State<LoginScreen> {
     super.initState();
     PackageInfo.fromPlatform()
         .then((i) { if (mounted) setState(() => _appVersion = i.version); });
+    SharedPreferences.getInstance()
+        .then((p) { if (mounted) setState(() => _rememberMe = p.getBool('remember_me') ?? true); });
   }
 
   @override
@@ -58,6 +62,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       await SupabaseService.signIn(email, password);
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('remember_me', _rememberMe);
 
       // Sync remote profile into local DB before navigating so the rest of the
       // app immediately sees the correct name/role/org from Supabase.
@@ -213,41 +220,51 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 40),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: MediaQuery.of(context).size.height,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 28),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
 
               // App logo & branding
-              Row(children: [
-                const OrgLogo(size: 64, circular: false),
-                const SizedBox(width: 16),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              Center(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      org.appName,
-                      style: TextStyle(
-                        color: context.colors.textPrimary,
-                        fontSize: 30,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    Text(
-                      org.tagline,
-                      style: TextStyle(
-                        color: context.colors.textSecondary,
-                        fontSize: 13,
-                        letterSpacing: 0.3,
-                      ),
+                    const OrgLogo(size: 64, circular: false),
+                    const SizedBox(width: 16),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          org.appName,
+                          style: TextStyle(
+                            color: context.colors.textPrimary,
+                            fontSize: 30,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        Text(
+                          org.tagline,
+                          style: TextStyle(
+                            color: context.colors.textSecondary,
+                            fontSize: 13,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ]),
+              ),
 
-              const SizedBox(height: 56),
+              const SizedBox(height: 40),
               Text(
                 'Sign In',
                 style: TextStyle(
@@ -304,16 +321,37 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
 
-              const SizedBox(height: 10),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: _isLoading ? null : _forgotPassword,
-                  child: const Text(
-                    'Forgot password?',
-                    style: TextStyle(color: AppColors.primaryLight, fontSize: 13),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: Checkbox(
+                      value: _rememberMe,
+                      onChanged: (v) => setState(() => _rememberMe = v ?? true),
+                      activeColor: AppColors.primary,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () => setState(() => _rememberMe = !_rememberMe),
+                    child: Text(
+                      'Remember me',
+                      style: TextStyle(
+                          color: context.colors.textSecondary, fontSize: 13),
+                    ),
+                  ),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: _isLoading ? null : _forgotPassword,
+                    child: const Text(
+                      'Forgot password?',
+                      style: TextStyle(color: AppColors.primaryLight, fontSize: 13),
+                    ),
+                  ),
+                ],
               ),
 
               // Error message
@@ -437,6 +475,8 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ),
-    );
+    ),
+  ),
+);
   }
 }
