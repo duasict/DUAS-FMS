@@ -171,23 +171,14 @@ class _BaseChecklistScreenState extends State<BaseChecklistScreen> {
     return widgets;
   }
 
-  String _titleFor(String type) {
-    switch (type) {
-      case 'equipment':  return 'Equipment Checklist';
-      case 'preflight':  return 'Pre-flight Checklist';
-      case 'inflight':   return 'In-flight Checklist';
-      case 'postflight': return 'Post-flight Checklist';
-      default:           return 'Checklist';
-    }
-  }
+  static const _checklistMeta = {
+    'equipment':  ('Equipment Checklist',       'Pre-mission equipment verification'),
+    'preflight':  ('Pre-flight Checklist',      'Annex A pre-flight compliance'),
+    'inflight':   ('In-flight Checklist',       'Annex A in-flight monitoring'),
+    'postflight': ('Post-flight Checklist',     'Annex A post-flight compliance'),
+  };
 
-  String _subtitleFor(String type) {
-    switch (type) {
-      case 'equipment':  return 'Pre-mission equipment verification';
-      case 'preflight':  return 'Annex A pre-flight compliance';
-      case 'inflight':   return 'Annex A in-flight monitoring';
-      case 'postflight': return 'Annex A post-flight compliance';
-      default:           return 'Annex A compliance checklist';
-    }
-  }
+  String _titleFor(String type) => _checklistMeta[type]?.$1 ?? 'Checklist';
+
+  String _subtitleFor(String type) => _checklistMeta[type]?.$2 ?? 'Annex A compliance checklist';
 }

@@ -104,6 +104,12 @@ class _MainNavigationState extends State<MainNavigation>
     }
   }
 
+  Widget _alertBadge(IconData icon, int unread) => Badge(
+        isLabelVisible: unread > 0,
+        label: Text('$unread'),
+        child: Icon(icon),
+      );
+
   @override
   Widget build(BuildContext context) {
     final unread = context.watch<AppProvider>().unreadAlertCount;
@@ -133,16 +139,8 @@ class _MainNavigationState extends State<MainNavigation>
               label: 'Missions',
             ),
             BottomNavigationBarItem(
-              icon: Badge(
-                isLabelVisible: unread > 0,
-                label: Text('$unread'),
-                child: const Icon(Icons.notifications_outlined),
-              ),
-              activeIcon: Badge(
-                isLabelVisible: unread > 0,
-                label: Text('$unread'),
-                child: const Icon(Icons.notifications),
-              ),
+              icon: _alertBadge(Icons.notifications_outlined, unread),
+              activeIcon: _alertBadge(Icons.notifications, unread),
               label: 'Alerts',
             ),
             const BottomNavigationBarItem(

@@ -79,7 +79,7 @@ class _BatteryLogScreenState extends State<BatteryLogScreen> {
         (i) => i < old.length ? old[i] : TextEditingController(),
       );
     });
-    for (int i = newCount; i < old.length; i++) { old[i].dispose(); }
+    old.skip(newCount).forEach((c) => c.dispose());
   }
 
   Future<void> _updateCyclePreview(String batteryId) async {
@@ -88,10 +88,9 @@ class _BatteryLogScreenState extends State<BatteryLogScreen> {
       if (mounted) setState(() => _cyclePreview = null);
       return;
     }
-    final all = await DatabaseHelper.instance.getBatteryLogs();
+    final count = await DatabaseHelper.instance.getBatteryLogCycleCount(trimmed);
     // Guard: discard result if the field changed while we were awaiting
     if (!mounted || _batteryIdCtrl.text.trim() != trimmed) return;
-    final count = all.where((l) => l['battery_id'] == trimmed).length;
     setState(() => _cyclePreview = count + 1);
   }
 
@@ -135,12 +134,10 @@ class _BatteryLogScreenState extends State<BatteryLogScreen> {
     final voltageBefore = cellVoltages.fold(0.0, (sum, v) => sum + v);
     setState(() => _isSaving = true);
 
-    final profile = await DatabaseHelper.instance.getUserProfile();
-    final orgId = profile?.organizationId ?? '';
-
-    final allLogs = await DatabaseHelper.instance.getBatteryLogs();
-    final cycleCount =
-        allLogs.where((l) => l['battery_id'] == batteryId).length + 1;
+    final profileFut = DatabaseHelper.instance.getUserProfile();
+    final cycleFut = DatabaseHelper.instance.getBatteryLogCycleCount(batteryId);
+    final orgId = (await profileFut)?.organizationId ?? '';
+    final cycleCount = await cycleFut + 1;
     await DatabaseHelper.instance.insertBatteryLog({
       'battery_id': batteryId,
       'battery_type': _batteryType,
@@ -407,25 +404,7 @@ class _BatteryLogScreenState extends State<BatteryLogScreen> {
   Widget _buildCellGrid() {
     final count = _cellCtrls.length;
     if (count == 0) return const SizedBox.shrink();
-
-    const cols = 2;
-    final numRows = (count / cols).ceil();
     final total = _totalVoltage;
-
-    final cellRows = <Widget>[];
-    for (int row = 0; row < numRows; row++) {
-      if (row > 0) cellRows.add(const SizedBox(height: 8));
-      final start = row * cols;
-      final rowWidgets = <Widget>[];
-      for (int col = 0; col < cols; col++) {
-        final i = start + col;
-        if (col > 0) rowWidgets.add(const SizedBox(width: 8));
-        rowWidgets.add(Expanded(
-          child: i < count ? _cellInput(i) : const SizedBox(),
-        ));
-      }
-      cellRows.add(Row(children: rowWidgets));
-    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -446,7 +425,19 @@ class _BatteryLogScreenState extends State<BatteryLogScreen> {
           ),
         ]),
         const SizedBox(height: 8),
-        ...cellRows,
+        LayoutBuilder(
+          builder: (_, constraints) {
+            final cellWidth = (constraints.maxWidth - 8) / 2;
+            return Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: List.generate(
+                count,
+                (i) => SizedBox(width: cellWidth, child: _cellInput(i)),
+              ),
+            );
+          },
+        ),
         const SizedBox(height: 10),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),

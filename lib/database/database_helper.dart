@@ -1281,6 +1281,15 @@ class DatabaseHelper {
     return db.query('battery_logs', orderBy: 'log_date DESC');
   }
 
+  Future<int> getBatteryLogCycleCount(String batteryId) async {
+    final db = await database;
+    final rows = await db.rawQuery(
+      'SELECT COUNT(*) AS cnt FROM battery_logs WHERE battery_id = ?',
+      [batteryId],
+    );
+    return (rows.first['cnt'] as int?) ?? 0;
+  }
+
   // ─── Incident Reports ─────────────────────────────────────────────────────
 
   Future<int> insertIncidentReport(Map<String, dynamic> data) async {
