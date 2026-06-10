@@ -105,7 +105,7 @@ class _BaseChecklistScreenState extends State<BaseChecklistScreen> {
           children: [
             Text(_titleFor(widget.checklistType)),
             Text(
-              'Annex A compliance checklist',
+              _subtitleFor(widget.checklistType),
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w400,
@@ -173,10 +173,21 @@ class _BaseChecklistScreenState extends State<BaseChecklistScreen> {
 
   String _titleFor(String type) {
     switch (type) {
+      case 'equipment':  return 'Equipment Checklist';
       case 'preflight':  return 'Pre-flight Checklist';
       case 'inflight':   return 'In-flight Checklist';
       case 'postflight': return 'Post-flight Checklist';
       default:           return 'Checklist';
+    }
+  }
+
+  String _subtitleFor(String type) {
+    switch (type) {
+      case 'equipment':  return 'Pre-mission equipment verification';
+      case 'preflight':  return 'Annex A pre-flight compliance';
+      case 'inflight':   return 'Annex A in-flight monitoring';
+      case 'postflight': return 'Annex A post-flight compliance';
+      default:           return 'Annex A compliance checklist';
     }
   }
 }

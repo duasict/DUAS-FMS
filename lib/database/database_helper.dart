@@ -16,7 +16,7 @@ import '../services/org_settings_service.dart';
 
 class DatabaseHelper {
   static const _dbName = 'uas_fms.db';
-  static const _dbVersion = 14;
+  static const _dbVersion = 15;
 
   DatabaseHelper._();
   static final DatabaseHelper instance = DatabaseHelper._();
@@ -284,6 +284,10 @@ class DatabaseHelper {
       await db.execute("ALTER TABLE incident_reports ADD COLUMN photo_paths TEXT DEFAULT ''");
       await db.execute("ALTER TABLE flight_logs ADD COLUMN photo_paths TEXT DEFAULT ''");
     }
+    if (oldVersion < 15) {
+      await db.execute("ALTER TABLE battery_logs ADD COLUMN battery_type TEXT DEFAULT ''");
+      await db.execute("ALTER TABLE battery_logs ADD COLUMN cell_voltages TEXT DEFAULT ''");
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -507,8 +511,10 @@ class DatabaseHelper {
         aircraft_id INTEGER,
         mission_id INTEGER,
         battery_id TEXT NOT NULL,
+        battery_type TEXT DEFAULT '',
         log_date TEXT NOT NULL,
         charge_cycles INTEGER,
+        cell_voltages TEXT DEFAULT '',
         voltage_before REAL,
         voltage_after REAL,
         charge_time_min INTEGER,

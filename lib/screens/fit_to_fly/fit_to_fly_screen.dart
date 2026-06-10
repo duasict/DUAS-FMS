@@ -187,9 +187,9 @@ class _FitToFlyScreenState extends State<FitToFlyScreen> {
       appBar: AppBar(
         title: const AppBarTitle(title: 'Fit-to-Fly Clearance', subtitle: 'Pre-mission crew fitness'),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(36),
+          preferredSize: const Size.fromHeight(52),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
             child: ChecklistProgressBar(current: 1, steps: AppConstants.executionChecklistSteps),
           ),
         ),

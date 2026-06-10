@@ -42,6 +42,7 @@ Future<String?> showTimeConfirmationDialog(
   final confirmed = await showDialog<bool>(
     context: context,
     barrierDismissible: false,
+    barrierColor: Colors.black38,
     builder: (ctx) => AlertDialog(
       backgroundColor: ctx.colors.card,
       title: Row(children: [

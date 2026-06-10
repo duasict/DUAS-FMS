@@ -65,6 +65,7 @@ class PostflightChecklistScreen extends StatelessWidget {
         final anotherFlight = await showDialog<bool>(
           context: ctx,
           barrierDismissible: false,
+          barrierColor: Colors.black38,
           builder: (dialogCtx) => AlertDialog(
             backgroundColor: dialogCtx.colors.card,
             title: Row(children: [

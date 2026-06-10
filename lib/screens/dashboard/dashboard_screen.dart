@@ -6,10 +6,13 @@ import '../../theme/app_theme.dart';
 import '../../widgets/stat_card.dart';
 import '../../widgets/mission_card.dart';
 import '../../widgets/skeleton_loader.dart';
+import '../aircraft/aircraft_screen.dart';
 import '../mission_details/mission_details_screen.dart';
+import '../reports/fleet_summary_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
-  const DashboardScreen({super.key});
+  final void Function(int tab)? onTabSwitch;
+  const DashboardScreen({super.key, this.onTabSwitch});
 
   @override
   Widget build(BuildContext context) {
@@ -87,6 +90,7 @@ class DashboardScreen extends StatelessWidget {
                         icon: Icons.flight_takeoff,
                         color: AppColors.info,
                         bgColor: AppColors.infoBg,
+                        onTap: () => onTabSwitch?.call(1),
                       ),
                       StatCard(
                         label: 'Aircraft',
@@ -94,6 +98,8 @@ class DashboardScreen extends StatelessWidget {
                         icon: Icons.air,
                         color: AppColors.danger,
                         bgColor: AppColors.dangerBg,
+                        onTap: () => Navigator.push(context,
+                            MaterialPageRoute(builder: (_) => const AircraftScreen())),
                       ),
                       StatCard(
                         label: 'Pending Concurrences',
@@ -101,6 +107,7 @@ class DashboardScreen extends StatelessWidget {
                         icon: Icons.pending_actions,
                         color: AppColors.warning,
                         bgColor: AppColors.warningBg,
+                        onTap: () => onTabSwitch?.call(1),
                       ),
                       StatCard(
                         label: 'Total Flight Hours',
@@ -108,6 +115,8 @@ class DashboardScreen extends StatelessWidget {
                         icon: Icons.timer_outlined,
                         color: AppColors.success,
                         bgColor: AppColors.successBg,
+                        onTap: () => Navigator.push(context,
+                            MaterialPageRoute(builder: (_) => const FleetSummaryScreen())),
                       ),
                     ],
                   ),

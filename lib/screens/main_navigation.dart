@@ -22,8 +22,8 @@ class _MainNavigationState extends State<MainNavigation>
     with WidgetsBindingObserver {
   int _selectedIndex = 0;
 
-  final List<Widget> _screens = [
-    DashboardScreen(),
+  late final List<Widget> _screens = [
+    DashboardScreen(onTabSwitch: (i) => setState(() => _selectedIndex = i)),
     MissionsScreen(),
     AlertsScreen(),
     MoreScreen(),

@@ -4,6 +4,7 @@ import '../../models/flight_log.dart';
 import '../../database/database_helper.dart';
 import '../../providers/app_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/app_constants.dart';
 import '../../widgets/app_bar_title.dart';
 import '../checklists/checklist_widgets.dart';
 import '../../widgets/photo_picker_field.dart';
@@ -300,7 +301,7 @@ class _FlightLogScreenState extends State<FlightLogScreen> {
           preferredSize: const Size.fromHeight(52),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-            child: ChecklistProgressBar(current: 3),
+            child: ChecklistProgressBar(current: 5, steps: AppConstants.executionChecklistSteps),
           ),
         ),
       ),
