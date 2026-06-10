@@ -16,7 +16,7 @@ import '../services/org_settings_service.dart';
 
 class DatabaseHelper {
   static const _dbName = 'uas_fms.db';
-  static const _dbVersion = 13;
+  static const _dbVersion = 14;
 
   DatabaseHelper._();
   static final DatabaseHelper instance = DatabaseHelper._();
@@ -278,6 +278,12 @@ class DatabaseHelper {
         )
       ''');
     }
+    if (oldVersion < 14) {
+      await db.execute("ALTER TABLE aircraft ADD COLUMN photo_path TEXT DEFAULT ''");
+      await db.execute("ALTER TABLE maintenance_logs ADD COLUMN photo_paths TEXT DEFAULT ''");
+      await db.execute("ALTER TABLE incident_reports ADD COLUMN photo_paths TEXT DEFAULT ''");
+      await db.execute("ALTER TABLE flight_logs ADD COLUMN photo_paths TEXT DEFAULT ''");
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -336,7 +342,8 @@ class DatabaseHelper {
         model TEXT NOT NULL,
         serial_number TEXT NOT NULL DEFAULT '',
         mtow REAL NOT NULL,
-        status TEXT NOT NULL
+        status TEXT NOT NULL,
+        photo_path TEXT DEFAULT ''
       )
     ''');
 
@@ -399,6 +406,7 @@ class DatabaseHelper {
         data_photos TEXT,
         data_video TEXT,
         data_lidar INTEGER DEFAULT 0,
+        photo_paths TEXT DEFAULT '',
         next_maintenance TEXT,
         is_synced INTEGER DEFAULT 0
       )
@@ -487,6 +495,7 @@ class DatabaseHelper {
         signed_by TEXT NOT NULL DEFAULT '',
         remarks TEXT NOT NULL DEFAULT '',
         organization_id TEXT NOT NULL DEFAULT '',
+        photo_paths TEXT DEFAULT '',
         created_at TEXT NOT NULL,
         is_synced INTEGER DEFAULT 0
       )
@@ -529,6 +538,7 @@ class DatabaseHelper {
         reported_to_caap INTEGER NOT NULL DEFAULT 0,
         caap_reference TEXT,
         organization_id TEXT NOT NULL DEFAULT '',
+        photo_paths TEXT DEFAULT '',
         created_at TEXT NOT NULL,
         is_synced INTEGER DEFAULT 0
       )

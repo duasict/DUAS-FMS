@@ -13,7 +13,7 @@ class MissionCard extends StatelessWidget {
       case 'completed':
         return AppColors.success;
       case 'planning':
-        return AppColors.primary;
+        return AppColors.info;
       case 'in_progress':
         return AppColors.accent;
       case 'cancelled':

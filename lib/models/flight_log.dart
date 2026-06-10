@@ -84,6 +84,7 @@ class FlightLog {
   String? dataCapturedPhotos;
   String? dataCapturedVideo;
   bool dataCapturedLidar;
+  List<String> photoPaths = const [];
   String nextMaintenance;
   bool isSynced;
 
@@ -115,6 +116,7 @@ class FlightLog {
     this.dataCapturedPhotos,
     this.dataCapturedVideo,
     this.dataCapturedLidar = false,
+    this.photoPaths = const [],
     this.nextMaintenance = '',
     this.isSynced = false,
   });
@@ -167,6 +169,7 @@ class FlightLog {
       dataCapturedPhotos: map['data_photos'],
       dataCapturedVideo: map['data_video'],
       dataCapturedLidar: map['data_lidar'] == 1,
+      photoPaths: parseStringList(map['photo_paths']),
       nextMaintenance: map['next_maintenance'] ?? '',
       isSynced: map['is_synced'] == 1,
     );
@@ -201,6 +204,7 @@ class FlightLog {
       'data_photos': dataCapturedPhotos,
       'data_video': dataCapturedVideo,
       'data_lidar': dataCapturedLidar ? 1 : 0,
+      'photo_paths': jsonEncode(photoPaths),
       'next_maintenance': nextMaintenance,
       'is_synced': isSynced ? 1 : 0,
     };

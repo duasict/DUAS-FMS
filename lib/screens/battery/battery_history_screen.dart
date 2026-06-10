@@ -166,7 +166,7 @@ class _BatteryHistoryScreenState extends State<BatteryHistoryScreen> {
         },
         icon: const Icon(Icons.add, size: 20),
         label: const Text('New Log'),
-        backgroundColor: AppColors.accent,
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
       ),
     );

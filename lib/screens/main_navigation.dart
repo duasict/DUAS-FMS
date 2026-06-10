@@ -120,6 +120,7 @@ class _MainNavigationState extends State<MainNavigation>
         child: BottomNavigationBar(
           currentIndex: _selectedIndex,
           onTap: (i) => setState(() => _selectedIndex = i),
+          selectedItemColor: AppColors.accent,
           items: [
             const BottomNavigationBarItem(
               icon: Icon(Icons.dashboard_outlined),

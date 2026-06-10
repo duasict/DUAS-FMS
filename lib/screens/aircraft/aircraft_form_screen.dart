@@ -4,6 +4,7 @@ import '../../database/database_helper.dart';
 import '../../models/aircraft.dart';
 import '../../providers/app_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/photo_picker_field.dart';
 
 class AircraftFormScreen extends StatefulWidget {
   final Aircraft? aircraft;
@@ -21,6 +22,7 @@ class _AircraftFormScreenState extends State<AircraftFormScreen> {
 
   String _type = 'multi-rotor';
   String _status = 'serviceable';
+  String _photoPath = '';
   bool _isSaving = false;
 
   bool get _isEdit => widget.aircraft != null;
@@ -50,6 +52,7 @@ class _AircraftFormScreenState extends State<AircraftFormScreen> {
       _mtowCtrl.text = a.mtow.toString();
       _type = a.type;
       _status = a.status;
+      _photoPath = a.photoPath;
     }
   }
 
@@ -87,6 +90,7 @@ class _AircraftFormScreenState extends State<AircraftFormScreen> {
       serialNumber: _serialCtrl.text.trim(),
       mtow: mtow,
       status: _status,
+      photoPath: _photoPath,
     );
 
     if (_isEdit) {
@@ -220,6 +224,14 @@ class _AircraftFormScreenState extends State<AircraftFormScreen> {
           _sectionLabel('STATUS'),
           const SizedBox(height: 10),
           _statusSelector(),
+          const SizedBox(height: 24),
+          _sectionLabel('AIRCRAFT PHOTO'),
+          const SizedBox(height: 10),
+          PhotoPickerField(
+            paths: _photoPath.isEmpty ? [] : [_photoPath],
+            onChanged: (v) => setState(() => _photoPath = v.isEmpty ? '' : v.first),
+            maxPhotos: 1,
+          ),
           const SizedBox(height: 36),
           SizedBox(
             width: double.infinity,

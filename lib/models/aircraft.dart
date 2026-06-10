@@ -6,6 +6,7 @@ class Aircraft {
   String serialNumber;
   double mtow;
   String status; // serviceable, under_maintenance, unserviceable
+  String photoPath;
 
   Aircraft({
     this.id,
@@ -15,6 +16,7 @@ class Aircraft {
     this.serialNumber = '',
     required this.mtow,
     required this.status,
+    this.photoPath = '',
   });
 
   factory Aircraft.fromMap(Map<String, dynamic> map) {
@@ -26,6 +28,7 @@ class Aircraft {
       serialNumber: map['serial_number'] as String? ?? '',
       mtow: (map['mtow'] as num).toDouble(),
       status: map['status'],
+      photoPath: map['photo_path'] as String? ?? '',
     );
   }
 
@@ -38,6 +41,7 @@ class Aircraft {
       'serial_number': serialNumber,
       'mtow': mtow,
       'status': status,
+      'photo_path': photoPath,
     };
   }
 

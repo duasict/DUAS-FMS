@@ -752,6 +752,11 @@ class _MissionCreateScreenState extends State<MissionCreateScreen> {
     );
   }
 
+  String _toLabel(String s) => s
+      .split(RegExp(r'[_\-]'))
+      .map((w) => w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1)}')
+      .join(' ');
+
   Widget _dropdownField({
     required String label,
     required String value,
@@ -775,7 +780,7 @@ class _MissionCreateScreenState extends State<MissionCreateScreen> {
             style: TextStyle(
                 color: context.colors.textSecondary, fontSize: 12)),
         items: items
-            .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+            .map((s) => DropdownMenuItem(value: s, child: Text(_toLabel(s))))
             .toList(),
         onChanged: onChanged,
       ),

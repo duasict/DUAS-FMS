@@ -24,6 +24,7 @@ class AircraftScreen extends StatelessWidget {
                   _AircraftCard(aircraft: aircraft[i]),
             ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: null,
         onPressed: () => _openForm(context, null),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,

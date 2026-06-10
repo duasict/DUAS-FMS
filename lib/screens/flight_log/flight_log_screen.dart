@@ -6,6 +6,7 @@ import '../../providers/app_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_bar_title.dart';
 import '../checklists/checklist_widgets.dart';
+import '../../widgets/photo_picker_field.dart';
 
 class FlightLogScreen extends StatefulWidget {
   final int missionId;
@@ -82,6 +83,7 @@ class _FlightLogScreenState extends State<FlightLogScreen> {
 
   String _platformType = 'multi-rotor';
   final Set<String> _payload = {};
+  List<String> _photoPaths = [];
   String _missionType = 'Survey';
   String _notamsType = 'None';
   final Set<String> _anomalies = {};
@@ -257,6 +259,7 @@ class _FlightLogScreenState extends State<FlightLogScreen> {
       dataCapturedVideo:
           _videoCtrl.text.isEmpty ? null : _videoCtrl.text,
       dataCapturedLidar: _lidar,
+      photoPaths: _photoPaths,
       nextMaintenance: _nextMaintenanceCtrl.text,
       isSynced: false,
     );
@@ -479,6 +482,11 @@ class _FlightLogScreenState extends State<FlightLogScreen> {
                         style: TextStyle(
                             color: context.colors.textSecondary, fontSize: 13)),
                   ]),
+                  const SizedBox(height: 10),
+                  PhotoPickerField(
+                    paths: _photoPaths,
+                    onChanged: (v) => setState(() => _photoPaths = v),
+                  ),
                 ]),
                 _logSection('NEXT MAINTENANCE', Icons.build_outlined, [
                   _field('Due hrs / date (e.g. 50 hrs / 2025-08-01)',

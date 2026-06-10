@@ -321,6 +321,11 @@ class _BatteryLogScreenState extends State<BatteryLogScreen> {
     );
   }
 
+  String _toLabel(String s) => s
+      .split(RegExp(r'[_\-]'))
+      .map((w) => w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1)}')
+      .join(' ');
+
   Widget _dropdownStr({required String label, required String value, required List<String> items, required ValueChanged<String?> onChanged}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -329,7 +334,7 @@ class _BatteryLogScreenState extends State<BatteryLogScreen> {
         value: value, isExpanded: true, underline: const SizedBox(),
         dropdownColor: context.colors.card,
         style: TextStyle(color: context.colors.textPrimary, fontSize: 13),
-        items: items.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+        items: items.map((s) => DropdownMenuItem(value: s, child: Text(_toLabel(s)))).toList(),
         onChanged: onChanged,
       ),
     );

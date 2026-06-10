@@ -331,6 +331,11 @@ class _FlightPlanningScreenState extends State<FlightPlanningScreen> {
                 color: context.colors.textSecondary, fontSize: 12)),
       );
 
+  String _toLabel(String s) => s
+      .split(RegExp(r'[_\-]'))
+      .map((w) => w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1)}')
+      .join(' ');
+
   Widget _dropdown({
     required String value,
     required List<String> items,
@@ -350,7 +355,7 @@ class _FlightPlanningScreenState extends State<FlightPlanningScreen> {
         dropdownColor: context.colors.card,
         style: TextStyle(color: context.colors.textPrimary, fontSize: 13),
         items: items
-            .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+            .map((s) => DropdownMenuItem(value: s, child: Text(_toLabel(s))))
             .toList(),
         onChanged: onChanged,
       ),

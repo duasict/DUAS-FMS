@@ -150,7 +150,7 @@ class _IncidentHistoryScreenState extends State<IncidentHistoryScreen> {
         },
         icon: const Icon(Icons.add, size: 20),
         label: const Text('New Report'),
-        backgroundColor: AppColors.accent,
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
       ),
     );

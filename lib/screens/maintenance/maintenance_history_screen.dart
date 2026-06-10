@@ -200,7 +200,7 @@ class _MaintenanceHistoryScreenState extends State<MaintenanceHistoryScreen> {
         },
         icon: const Icon(Icons.add, size: 20),
         label: const Text('New Log'),
-        backgroundColor: AppColors.accent,
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
       ),
     );

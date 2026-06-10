@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/org_settings_provider.dart';
 import '../services/supabase_service.dart';
 import '../theme/app_theme.dart';
@@ -42,9 +43,15 @@ class _SplashScreenState extends State<SplashScreen>
   Widget? _destination;
 
   Future<void> _checkAuth() async {
+    final prefs = await SharedPreferences.getInstance();
+    final rememberMe = prefs.getBool('remember_me') ?? true;
+    if (!rememberMe) {
+      await SupabaseService.signOut();
+      _destination = const LoginScreen();
+      return;
+    }
     final session = SupabaseService.currentSession;
-    _destination =
-        session != null ? const MainNavigation() : const LoginScreen();
+    _destination = session != null ? const MainNavigation() : const LoginScreen();
   }
 
   void _navigate() {
