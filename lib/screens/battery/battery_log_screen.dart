@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../database/database_helper.dart';
 import '../../models/aircraft.dart';
+import '../../models/equipment_item.dart';
 import '../../services/org_settings_service.dart';
 import '../../services/pdf_generator_service.dart';
 import '../../services/sync_service.dart';
@@ -27,6 +28,8 @@ class _BatteryLogScreenState extends State<BatteryLogScreen> {
   int? _cyclePreview;
 
   List<Aircraft> _aircraft = [];
+  List<EquipmentItem> _batteries = [];
+  EquipmentItem? _selectedBattery;
   int? _selectedAircraftId;
   DateTime? _logDate;
   String _status = 'good';
@@ -45,13 +48,33 @@ class _BatteryLogScreenState extends State<BatteryLogScreen> {
   }
 
   Future<void> _loadAircraft() async {
-    final ac = await DatabaseHelper.instance.getAircraft();
+    final db = DatabaseHelper.instance;
+    final results = await Future.wait([
+      db.getAircraft(),
+      db.getEquipmentByType('battery'),
+    ]);
     if (mounted) {
       setState(() {
-        _aircraft = ac;
+        _aircraft = results[0] as List<Aircraft>;
+        _batteries = (results[1] as List<Map<String, dynamic>>)
+            .map(EquipmentItem.fromMap)
+            .toList();
         _isLoading = false;
       });
     }
+  }
+
+  void _onBatterySelected(EquipmentItem? item) {
+    setState(() {
+      _selectedBattery = item;
+      if (item != null) {
+        _batteryIdCtrl.text = item.equipmentCode;
+        if (item.batteryType.isNotEmpty) {
+          _onTypeChanged(item.batteryType);
+        }
+        _updateCyclePreview(item.equipmentCode);
+      }
+    });
   }
 
   @override
@@ -141,6 +164,7 @@ class _BatteryLogScreenState extends State<BatteryLogScreen> {
     await DatabaseHelper.instance.insertBatteryLog({
       'battery_id': batteryId,
       'battery_type': _batteryType,
+      'equipment_id': _selectedBattery?.id,
       'aircraft_id': _selectedAircraftId,
       'log_date': _formatDate(_logDate),
       'charge_cycles': cycleCount,
@@ -239,15 +263,47 @@ class _BatteryLogScreenState extends State<BatteryLogScreen> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
               children: [
                 _section('BATTERY IDENTIFICATION', Icons.battery_full_outlined, [
+                  if (_batteries.isNotEmpty) ...[
+                    _labeledDropdown(
+                      label: 'Select from Equipment Locker',
+                      child: DropdownButton<EquipmentItem?>(
+                        value: _selectedBattery,
+                        isExpanded: true,
+                        underline: const SizedBox(),
+                        dropdownColor: context.colors.card,
+                        style: TextStyle(color: context.colors.textPrimary, fontSize: 13),
+                        items: [
+                          DropdownMenuItem<EquipmentItem?>(
+                            value: null,
+                            child: Text('Enter manually',
+                                style: TextStyle(color: context.colors.textSecondary)),
+                          ),
+                          ..._batteries.map((b) => DropdownMenuItem(
+                              value: b,
+                              child: Text('${b.equipmentCode}  ${b.name}'))),
+                        ],
+                        onChanged: _onBatterySelected,
+                      ),
+                    ),
+                    if (_selectedBattery != null) ...[
+                      const SizedBox(height: 8),
+                      _infoBadgeRow(_selectedBattery!),
+                    ],
+                    const SizedBox(height: 10),
+                  ],
                   TextField(
                     controller: _batteryIdCtrl,
+                    enabled: _selectedBattery == null,
                     style: TextStyle(
                         color: context.colors.textPrimary, fontSize: 13),
                     onChanged: _updateCyclePreview,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Battery ID *',
                       hintText: 'e.g. BAT-001',
                       isDense: true,
+                      suffixIcon: _selectedBattery != null
+                          ? const Icon(Icons.lock_outline, size: 14)
+                          : null,
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -617,6 +673,39 @@ class _BatteryLogScreenState extends State<BatteryLogScreen> {
             .toList(),
         onChanged: onChanged,
       ),
+    );
+  }
+
+  Widget _infoBadgeRow(EquipmentItem item) {
+    final badges = <(String, String)>[
+      if (item.serialNumber.isNotEmpty) ('S/N', item.serialNumber),
+      if (item.capacityMah > 0) ('Capacity', '${item.capacityMah} mAh'),
+      if (item.manufacturer.isNotEmpty) ('Mfr', item.manufacturer),
+    ];
+    if (badges.isEmpty) return const SizedBox.shrink();
+    return Wrap(
+      spacing: 8,
+      runSpacing: 6,
+      children: badges.map((b) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+        ),
+        child: RichText(
+          text: TextSpan(
+            children: [
+              TextSpan(text: '${b.$1}  ',
+                  style: TextStyle(color: context.colors.textMuted, fontSize: 10,
+                      fontWeight: FontWeight.w600)),
+              TextSpan(text: b.$2,
+                  style: const TextStyle(color: AppColors.primary, fontSize: 11,
+                      fontWeight: FontWeight.w700)),
+            ],
+          ),
+        ),
+      )).toList(),
     );
   }
 

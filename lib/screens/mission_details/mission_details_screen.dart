@@ -1,7 +1,11 @@
+import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../models/flight_plan.dart';
 import '../../models/mission.dart';
 import '../../models/crew_member.dart';
+import '../../models/user_profile.dart';
 import '../../database/database_helper.dart';
 import '../../providers/app_provider.dart';
 import '../../providers/user_profile_provider.dart';
@@ -10,6 +14,7 @@ import '../checklists/inflight_checklist_screen.dart';
 import '../missions/mission_edit_screen.dart';
 import '../checklists/postflight_checklist_screen.dart';
 import '../checklists/preflight_checklist_screen.dart';
+import '../document_submission/document_submission_screen.dart';
 import '../equipment_checklist/equipment_checklist_screen.dart';
 import '../fit_to_fly/fit_to_fly_screen.dart';
 import '../flight_log/flight_log_screen.dart';
@@ -27,6 +32,9 @@ class MissionDetailsScreen extends StatefulWidget {
 
 class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
   Mission? _mission;
+  FlightPlan? _flightPlan;
+  UserProfile? _localProfile;
+  List<Map<String, dynamic>> _documents = [];
   Map<String, dynamic>? _latestBatteryLog;
   bool _isLoading = true;
 
@@ -37,16 +45,24 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
   }
 
   Future<void> _load() async {
-    final m = await DatabaseHelper.instance.getMissionById(widget.missionId);
-    Map<String, dynamic>? battLog;
-    if (m?.aircraftId != null) {
-      battLog = await DatabaseHelper.instance
-          .getLatestBatteryLogByAircraft(m!.aircraftId!);
-    }
+    final db = DatabaseHelper.instance;
+    final m = await db.getMissionById(widget.missionId);
+    final results = await Future.wait([
+      if (m?.aircraftId != null)
+        db.getLatestBatteryLogByAircraft(m!.aircraftId!)
+      else
+        Future.value(null),
+      db.getFlightPlanByMissionId(widget.missionId),
+      db.getUserProfile(),
+      db.getMissionDocuments(widget.missionId),
+    ]);
     if (mounted) {
       setState(() {
         _mission = m;
-        _latestBatteryLog = battLog;
+        _latestBatteryLog = results[0] as Map<String, dynamic>?;
+        _flightPlan = results[1] as FlightPlan?;
+        _localProfile = results[2] as UserProfile?;
+        _documents = results[3] as List<Map<String, dynamic>>;
         _isLoading = false;
       });
     }
@@ -63,7 +79,9 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
     final title = m.title;
 
     Widget next;
-    if (!m.hasFlightPlanComplete) {
+    if (!m.hasDocumentsComplete) {
+      next = DocumentSubmissionScreen(missionId: id, missionTitle: title);
+    } else if (!m.hasFlightPlanComplete) {
       next = FlightPlanningScreen(missionId: id, missionTitle: title);
     } else if (!m.hasHiraComplete) {
       next = HiraScreen(missionId: id, missionTitle: title);
@@ -443,8 +461,20 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
             _SectionCard(
               icon: Icons.people_outline,
               title: 'Crew Members',
-              children: m.crew.map((c) => _CrewTile(member: c)).toList(),
+              children: m.crew
+                  .map((c) => _CrewTile(member: c, localProfile: _localProfile))
+                  .toList(),
             ),
+
+          if (_documents.isNotEmpty)
+            _DocumentsCard(
+              documents: _documents,
+              onEdit: () => _navigateToStep(DocumentSubmissionScreen(
+                  missionId: m.id!, missionTitle: m.title)),
+            ),
+
+          if (_flightPlan?.coverageAreaGeoJson != null)
+            _CoverageAreaCard(geoJson: _flightPlan!.coverageAreaGeoJson!),
 
           if (m.isCompleted) ...[
             const SizedBox(height: 4),
@@ -624,6 +654,13 @@ class _ChecklistProgressRow extends StatelessWidget {
       _groupLabel(context, 'PRE-DEPLOYMENT'),
       const SizedBox(height: 6),
       Row(children: [
+        _ProgressStep(
+          label: 'Docs',
+          done: m.hasDocumentsComplete,
+          onTap: () => onStepTap(
+              DocumentSubmissionScreen(missionId: id, missionTitle: title)),
+        ),
+        _ProgressArrow(),
         _ProgressStep(
           label: 'Flight Plan',
           done: m.hasFlightPlanComplete,
@@ -851,7 +888,56 @@ class _Row extends StatelessWidget {
 
 class _CrewTile extends StatelessWidget {
   final CrewMember member;
-  const _CrewTile({required this.member});
+  final UserProfile? localProfile;
+  const _CrewTile({required this.member, this.localProfile});
+
+  bool get _isRpic => member.role.toLowerCase() == 'rpic';
+
+  void _showLicense(BuildContext context) {
+    final isSelf = localProfile != null &&
+        member.userId != null &&
+        localProfile!.supabaseId == member.userId;
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: ctx.colors.card,
+        title: Row(children: [
+          const Icon(Icons.badge_outlined, color: AppColors.accent, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text('RPIC License — ${member.name}',
+                style: TextStyle(
+                    color: ctx.colors.textPrimary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600)),
+          ),
+        ]),
+        content: isSelf
+            ? Column(mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start, children: [
+                _LicenseRow('License No.', localProfile!.licenseNumber.isNotEmpty
+                    ? localProfile!.licenseNumber : '—'),
+                const SizedBox(height: 8),
+                _LicenseRow('Expiry',
+                    localProfile!.licenseExpiryDate ?? '—'),
+                const SizedBox(height: 8),
+                _LicenseRow('Status',
+                    localProfile!.licenseVerified ? 'Verified ✓' : 'Unverified'),
+              ])
+            : Text(
+                'License on file. Accessible on the crew member\'s device.',
+                style: TextStyle(color: ctx.colors.textSecondary, fontSize: 13),
+              ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -865,8 +951,7 @@ class _CrewTile extends StatelessWidget {
             color: AppColors.primary.withValues(alpha: 0.12),
             shape: BoxShape.circle,
           ),
-          child: const Icon(Icons.person,
-              size: 16, color: AppColors.primaryLight),
+          child: const Icon(Icons.person, size: 16, color: AppColors.primaryLight),
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -876,6 +961,25 @@ class _CrewTile extends StatelessWidget {
                   fontSize: 13,
                   fontWeight: FontWeight.w500)),
         ),
+        if (_isRpic)
+          GestureDetector(
+            onTap: () => _showLicense(context),
+            child: Container(
+              margin: const EdgeInsets.only(right: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                color: AppColors.accent.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: AppColors.accent.withValues(alpha: 0.4)),
+              ),
+              child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.badge_outlined, size: 11, color: AppColors.accent),
+                SizedBox(width: 3),
+                Text('License', style: TextStyle(
+                    color: AppColors.accent, fontSize: 10, fontWeight: FontWeight.w700)),
+              ]),
+            ),
+          ),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
           decoration: BoxDecoration(
@@ -889,6 +993,214 @@ class _CrewTile extends StatelessWidget {
                   fontSize: 11,
                   fontWeight: FontWeight.w600)),
         ),
+      ]),
+    );
+  }
+}
+
+class _LicenseRow extends StatelessWidget {
+  final String label;
+  final String value;
+  const _LicenseRow(this.label, this.value);
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      SizedBox(
+        width: 90,
+        child: Text('$label:',
+            style: TextStyle(color: context.colors.textMuted, fontSize: 12)),
+      ),
+      Expanded(
+        child: Text(value,
+            style: TextStyle(
+                color: context.colors.textPrimary,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                fontFamily: 'monospace')),
+      ),
+    ]);
+  }
+}
+
+// ── Documents Card ────────────────────────────────────────────────────────────
+
+class _DocumentsCard extends StatelessWidget {
+  final List<Map<String, dynamic>> documents;
+  final VoidCallback onEdit;
+  const _DocumentsCard({required this.documents, required this.onEdit});
+
+  static const _typeLabels = {
+    'travel_order': 'Travel Order',
+    'site_permission': 'Site Permission',
+    'property_owner': 'Property Owner',
+  };
+
+  static const _typeIcons = {
+    'travel_order': Icons.description_outlined,
+    'site_permission': Icons.verified_outlined,
+    'property_owner': Icons.house_outlined,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: context.colors.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: context.colors.border),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Icon(Icons.folder_outlined, size: 16, color: AppColors.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text('Mission Documents',
+                style: TextStyle(
+                    color: context.colors.textPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700)),
+          ),
+          GestureDetector(
+            onTap: onEdit,
+            child: Text('Edit',
+                style: const TextStyle(
+                    color: AppColors.primary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600)),
+          ),
+        ]),
+        const SizedBox(height: 10),
+        for (final doc in documents) ...[
+          _docRow(context, doc),
+          if (doc != documents.last) const SizedBox(height: 6),
+        ],
+      ]),
+    );
+  }
+
+  Widget _docRow(BuildContext context, Map<String, dynamic> doc) {
+    final type = doc['document_type'] as String? ?? '';
+    final permType = doc['permission_type'] as String? ?? '';
+    final path = doc['file_path'] as String? ?? '';
+    final name = path.isNotEmpty ? path.split('/').last.split('\\').last : '—';
+    final isPdf = name.toLowerCase().endsWith('.pdf');
+    final label = _typeLabels[type] ?? type;
+    final icon = _typeIcons[type] ?? Icons.insert_drive_file_outlined;
+    final subtitle =
+        (type == 'site_permission' && permType.isNotEmpty) ? permType : null;
+
+    return Row(children: [
+      Icon(icon, size: 15, color: context.colors.textMuted),
+      const SizedBox(width: 8),
+      Expanded(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(subtitle != null ? '$label — $subtitle' : label,
+              style: TextStyle(
+                  color: context.colors.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500)),
+          Text(name,
+              style: TextStyle(color: context.colors.textMuted, fontSize: 11),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis),
+        ]),
+      ),
+      Icon(isPdf ? Icons.picture_as_pdf_outlined : Icons.image_outlined,
+          size: 13,
+          color: isPdf ? AppColors.danger : context.colors.textMuted),
+    ]);
+  }
+}
+
+// ── Coverage Area Card ────────────────────────────────────────────────────────
+
+class _CoverageAreaCard extends StatelessWidget {
+  final String geoJson;
+  const _CoverageAreaCard({required this.geoJson});
+
+  double _calcAreaHa() {
+    try {
+      final decoded = jsonDecode(geoJson) as Map<String, dynamic>;
+      final type = decoded['type'] as String?;
+      List<dynamic> coords;
+      if (type == 'Polygon') {
+        coords = (decoded['coordinates'] as List).first as List;
+      } else if (type == 'Feature') {
+        final geo = decoded['geometry'] as Map<String, dynamic>;
+        coords = (geo['coordinates'] as List).first as List;
+      } else {
+        return 0;
+      }
+      const R = 6371000.0;
+      double area = 0;
+      for (int i = 0; i < coords.length; i++) {
+        final j = (i + 1) % coords.length;
+        final lonI = (coords[i][0] as num).toDouble() * pi / 180;
+        final latI = (coords[i][1] as num).toDouble() * pi / 180;
+        final lonJ = (coords[j][0] as num).toDouble() * pi / 180;
+        final latJ = (coords[j][1] as num).toDouble() * pi / 180;
+        area += (lonJ - lonI) * (2 + sin(latI) + sin(latJ));
+      }
+      return (area.abs() * R * R / 2) / 10000;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ha = _calcAreaHa();
+    final areaStr = ha > 0
+        ? ha >= 100
+            ? '${(ha / 100).toStringAsFixed(2)} km²'
+            : '${ha.toStringAsFixed(2)} ha'
+        : 'Plotted';
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 5),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: context.colors.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: context.colors.border),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(Icons.map_outlined, size: 15, color: context.colors.textMuted),
+          const SizedBox(width: 7),
+          Text('COVERAGE AREA',
+              style: TextStyle(
+                  color: context.colors.textMuted,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8)),
+        ]),
+        const SizedBox(height: 10),
+        const Divider(height: 1),
+        const SizedBox(height: 10),
+        Row(children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.crop_free, color: AppColors.primary, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(areaStr,
+                style: TextStyle(
+                    color: context.colors.textPrimary,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700)),
+            Text('Plotted coverage area',
+                style: TextStyle(color: context.colors.textMuted, fontSize: 11)),
+          ]),
+        ]),
       ]),
     );
   }
@@ -1011,6 +1323,7 @@ class _BottomAction extends StatelessWidget {
   }
 
   String _nextStepLabel(Mission m) {
+    if (!m.hasDocumentsComplete) return 'Submit Required Documents';
     if (!m.hasFlightPlanComplete) return 'Start Flight Planning';
     if (!m.hasHiraComplete) return 'Continue to HIRA Assessment';
     if (!m.hasEquipmentComplete) return 'Continue to Equipment Check';
@@ -1023,6 +1336,7 @@ class _BottomAction extends StatelessWidget {
   }
 
   IconData _nextStepIcon(Mission m) {
+    if (!m.hasDocumentsComplete) return Icons.upload_file_outlined;
     if (!m.hasFlightPlanComplete) return Icons.map_outlined;
     if (!m.hasHiraComplete) return Icons.warning_amber_outlined;
     if (!m.hasEquipmentComplete) return Icons.inventory_2_outlined;

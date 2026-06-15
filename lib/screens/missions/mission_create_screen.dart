@@ -6,6 +6,7 @@ import '../../models/crew_member.dart';
 import '../../models/mission.dart';
 import '../../models/user_profile.dart';
 import '../../providers/app_provider.dart';
+import '../../providers/user_profile_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_bar_title.dart';
 import '../mission_details/mission_details_screen.dart';
@@ -46,6 +47,7 @@ class _MissionCreateScreenState extends State<MissionCreateScreen> {
   String _selectedAircraftType = 'multi-rotor';
 
   List<Aircraft> _aircraft = [];
+  UserProfile? _currentProfile;
   bool _isLoading = true;
   bool _isSaving = false;
 
@@ -80,15 +82,22 @@ class _MissionCreateScreenState extends State<MissionCreateScreen> {
       DatabaseHelper.instance.getAircraft(),
       DatabaseHelper.instance.nextMissionId(),
       DatabaseHelper.instance.getEligiblePilots(),
+      DatabaseHelper.instance.getUserProfile(),
     ]);
     final ac = results[0] as List<Aircraft>;
     final id = results[1] as String;
     final pilots = results[2] as List<UserProfile>;
+    final profile = results[3] as UserProfile?;
     if (!mounted) return;
     setState(() {
       _aircraft = ac;
       _generatedId = id;
       _eligiblePilots = pilots;
+      _currentProfile = profile;
+      // Personal accounts fly solo — auto-populate themselves as RPIC
+      if (profile != null && profile.isPersonal) {
+        _selectedRpic = profile;
+      }
       if (ac.isNotEmpty) {
         _selectedAircraftId = ac.first.id;
         _selectedAircraftName = ac.first.name;
@@ -163,12 +172,12 @@ class _MissionCreateScreenState extends State<MissionCreateScreen> {
       '${_date.year}-${_date.month.toString().padLeft(2, '0')}-${_date.day.toString().padLeft(2, '0')}';
 
   Future<void> _submit() async {
+    final isPersonal = _currentProfile?.isPersonal ?? false;
     if (_titleCtrl.text.trim().isEmpty ||
         _locationCtrl.text.trim().isEmpty ||
         _objectiveCtrl.text.trim().isEmpty ||
-        _selectedRpic == null ||
-        _voGcsCtrl.text.trim().isEmpty ||
-        _selectedAircraftId == null) {
+        _selectedAircraftId == null ||
+        (!isPersonal && (_selectedRpic == null || _voGcsCtrl.text.trim().isEmpty))) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
             content: Text('Please fill in all required fields.'),
@@ -193,27 +202,42 @@ class _MissionCreateScreenState extends State<MissionCreateScreen> {
       aircraftId: _selectedAircraftId,
       aircraftName: _selectedAircraftName,
       aircraftType: _selectedAircraftType,
-      crpAdvisoryNotes: _crpNotesCtrl.text.trim(),
-      crpConcurrenceRequired: _crpConcurrenceRequired,
+      crpAdvisoryNotes: isPersonal ? '' : _crpNotesCtrl.text.trim(),
+      crpConcurrenceRequired: isPersonal ? false : _crpConcurrenceRequired,
       createdAt: DateTime.now().toIso8601String(),
     );
 
     final missionDbId = await DatabaseHelper.instance.insertMission(mission);
 
-    // Crew: 1 RPIC (required) + 1 VO or GCS (required) + extras
-    final crew = <Map<String, String>>[
-      {'name': _selectedRpic!.name, 'role': 'rpic'},
-      {'name': _voGcsCtrl.text.trim(), 'role': _voGcsRole},
+    // Personal: solo RPIC only. Org: RPIC + VO/GCS + extras.
+    final crew = <Map<String, dynamic>>[
+      if (_selectedRpic != null)
+        {
+          'name': _selectedRpic!.name,
+          'role': 'rpic',
+          'user_id': _selectedRpic!.supabaseId.isEmpty
+              ? null
+              : _selectedRpic!.supabaseId,
+        },
+      if (!isPersonal && _voGcsCtrl.text.trim().isNotEmpty)
+        {'name': _voGcsCtrl.text.trim(), 'role': _voGcsRole, 'user_id': null},
     ];
-    for (var i = 0; i < _extraNameCtrls.length; i++) {
-      final name = _extraNameCtrls[i].text.trim();
-      if (name.isNotEmpty) {
-        crew.add({'name': name, 'role': _extraRoles[i]});
+    if (!isPersonal) {
+      for (var i = 0; i < _extraNameCtrls.length; i++) {
+        final name = _extraNameCtrls[i].text.trim();
+        if (name.isNotEmpty) {
+          crew.add({'name': name, 'role': _extraRoles[i], 'user_id': null});
+        }
       }
     }
     for (final m in crew) {
       await DatabaseHelper.instance.insertCrewMember(
-          CrewMember(missionId: missionDbId, name: m['name']!, role: m['role']!));
+          CrewMember(
+            missionId: missionDbId,
+            name: m['name'] as String,
+            role: m['role'] as String,
+            userId: m['user_id'] as String?,
+          ));
     }
 
     await provider.refreshMissions();
@@ -227,6 +251,7 @@ class _MissionCreateScreenState extends State<MissionCreateScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isPersonal = context.watch<UserProfileProvider>().profile.isPersonal;
     return Scaffold(
       appBar: AppBar(title: const AppBarTitle(title: 'New Mission', subtitle: 'Plan a new operation')),
       body: _isLoading
@@ -315,43 +340,38 @@ class _MissionCreateScreenState extends State<MissionCreateScreen> {
                     ),
                   ),
 
-                // ── Crew Assignment ──────────────────────────────────────
-                const SizedBox(height: 20),
-                _sectionHeader(Icons.people_outline, 'Crew Assignment'),
-                _infoTile(
-                  Icons.info_outline,
-                  'Crew rule: exactly 1 RPIC (required) + at least 1 VO or GCS (required).',
-                  color: AppColors.accent,
-                ),
-                const SizedBox(height: 10),
+                // ── Crew Assignment (org accounts only) ──────────────────
+                if (!isPersonal) ...[
+                  const SizedBox(height: 20),
+                  _sectionHeader(Icons.people_outline, 'Crew Assignment'),
+                  _infoTile(
+                    Icons.info_outline,
+                    'Crew rule: exactly 1 RPIC (required) + at least 1 VO or GCS (required).',
+                    color: AppColors.accent,
+                  ),
+                  const SizedBox(height: 10),
+                  _rpicPickerRow(),
+                  const SizedBox(height: 10),
+                  _voGcsRow(),
+                  const SizedBox(height: 10),
+                  ..._extraCrewRows(),
+                  TextButton.icon(
+                    onPressed: _addCrewRow,
+                    icon: const Icon(Icons.add, size: 16),
+                    label: const Text('Add Crew Member'),
+                    style: TextButton.styleFrom(foregroundColor: AppColors.primaryLight),
+                  ),
 
-                // RPIC row — must be a verified PIC
-                _rpicPickerRow(),
-                const SizedBox(height: 10),
-
-                // VO / GCS row with role toggle
-                _voGcsRow(),
-
-                const SizedBox(height: 10),
-                ..._extraCrewRows(),
-                TextButton.icon(
-                  onPressed: _addCrewRow,
-                  icon: const Icon(Icons.add, size: 16),
-                  label: const Text('Add Crew Member'),
-                  style:
-                      TextButton.styleFrom(foregroundColor: AppColors.primaryLight),
-                ),
-
-                // ── CRP Advisory Notes (optional) ────────────────────────
-                const SizedBox(height: 20),
-                _sectionHeader(Icons.notes_outlined, 'CRP Advisory Notes'),
-                _inputField(_crpNotesCtrl, 'Advisory Notes (optional)',
-                    hint:
-                        'Operational guidance, cautions, or clearances from CRP...',
-                    maxLines: 3),
-                const SizedBox(height: 12),
-                // CRP concurrence toggle — only meaningful for HIGH-RISK missions
-                Container(
+                  // ── CRP Advisory Notes (optional) ──────────────────────
+                  const SizedBox(height: 20),
+                  _sectionHeader(Icons.notes_outlined, 'CRP Advisory Notes'),
+                  _inputField(_crpNotesCtrl, 'Advisory Notes (optional)',
+                      hint:
+                          'Operational guidance, cautions, or clearances from CRP...',
+                      maxLines: 3),
+                  const SizedBox(height: 12),
+                  // CRP concurrence toggle
+                  Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
                     color: _crpConcurrenceRequired
@@ -400,6 +420,7 @@ class _MissionCreateScreenState extends State<MissionCreateScreen> {
                     ),
                   ]),
                 ),
+                ], // end if (!isPersonal)
               ],
             ),
       bottomNavigationBar: SafeArea(

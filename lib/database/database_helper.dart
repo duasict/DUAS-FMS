@@ -16,7 +16,7 @@ import '../services/org_settings_service.dart';
 
 class DatabaseHelper {
   static const _dbName = 'uas_fms.db';
-  static const _dbVersion = 15;
+  static const _dbVersion = 16;
 
   DatabaseHelper._();
   static final DatabaseHelper instance = DatabaseHelper._();
@@ -288,6 +288,85 @@ class DatabaseHelper {
       await db.execute("ALTER TABLE battery_logs ADD COLUMN battery_type TEXT DEFAULT ''");
       await db.execute("ALTER TABLE battery_logs ADD COLUMN cell_voltages TEXT DEFAULT ''");
     }
+    if (oldVersion < 16) {
+      // New columns on existing tables
+      await db.execute("ALTER TABLE aircraft ADD COLUMN batteries_needed INTEGER DEFAULT 1");
+      await db.execute("ALTER TABLE user_profile ADD COLUMN account_type TEXT DEFAULT 'organizational'");
+      await db.execute("ALTER TABLE missions ADD COLUMN has_documents_complete INTEGER DEFAULT 0");
+      await db.execute("ALTER TABLE battery_logs ADD COLUMN equipment_id INTEGER");
+      // Equipment locker
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS equipment (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          equipment_code TEXT NOT NULL DEFAULT '',
+          name TEXT NOT NULL DEFAULT '',
+          type TEXT NOT NULL DEFAULT 'other',
+          serial_number TEXT NOT NULL DEFAULT '',
+          model TEXT NOT NULL DEFAULT '',
+          manufacturer TEXT NOT NULL DEFAULT '',
+          description TEXT NOT NULL DEFAULT '',
+          battery_type TEXT NOT NULL DEFAULT '',
+          capacity_mah INTEGER NOT NULL DEFAULT 0,
+          condition TEXT NOT NULL DEFAULT 'serviceable',
+          quantity INTEGER NOT NULL DEFAULT 1,
+          storage_location TEXT NOT NULL DEFAULT '',
+          purchase_date TEXT NOT NULL DEFAULT '',
+          notes TEXT NOT NULL DEFAULT '',
+          organization_id TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL,
+          is_synced INTEGER DEFAULT 0
+        )
+      ''');
+      // Equipment selected for each mission (from Equipment Checklist + Fit-to-Fly)
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS mission_equipment (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          mission_id INTEGER NOT NULL,
+          equipment_id INTEGER NOT NULL,
+          purpose TEXT NOT NULL DEFAULT '',
+          notes TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL
+        )
+      ''');
+      // Mission support documents (travel order, site permission, property owner)
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS mission_documents (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          mission_id INTEGER NOT NULL,
+          document_type TEXT NOT NULL,
+          permission_type TEXT NOT NULL DEFAULT '',
+          file_path TEXT NOT NULL DEFAULT '',
+          file_url TEXT NOT NULL DEFAULT '',
+          notes TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL,
+          is_synced INTEGER DEFAULT 0
+        )
+      ''');
+      // Time started / completed per checklist type per mission
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS checklist_timestamps (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          mission_id INTEGER NOT NULL,
+          checklist_type TEXT NOT NULL,
+          time_started TEXT NOT NULL DEFAULT '',
+          time_completed TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL,
+          UNIQUE(mission_id, checklist_type)
+        )
+      ''');
+      // Battery selections per flight in Fit-to-Fly
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS fit_to_fly_batteries (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          mission_id INTEGER NOT NULL,
+          slot_index INTEGER NOT NULL,
+          equipment_id INTEGER,
+          battery_label TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL,
+          UNIQUE(mission_id, slot_index)
+        )
+      ''');
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -313,6 +392,7 @@ class DatabaseHelper {
         crp_concurrence_status TEXT NOT NULL DEFAULT '',
         organization_id TEXT NOT NULL DEFAULT '',
         created_by TEXT,
+        has_documents_complete INTEGER DEFAULT 0,
         has_flight_plan_complete INTEGER DEFAULT 0,
         has_hira_complete INTEGER DEFAULT 0,
         has_equipment_complete INTEGER DEFAULT 0,
@@ -347,7 +427,8 @@ class DatabaseHelper {
         serial_number TEXT NOT NULL DEFAULT '',
         mtow REAL NOT NULL,
         status TEXT NOT NULL,
-        photo_path TEXT DEFAULT ''
+        photo_path TEXT DEFAULT '',
+        batteries_needed INTEGER DEFAULT 1
       )
     ''');
 
@@ -477,7 +558,8 @@ class DatabaseHelper {
         rank TEXT NOT NULL DEFAULT '',
         phone TEXT NOT NULL DEFAULT '',
         photo_path TEXT DEFAULT '',
-        organization_id TEXT NOT NULL DEFAULT ''
+        organization_id TEXT NOT NULL DEFAULT '',
+        account_type TEXT NOT NULL DEFAULT 'organizational'
       )
     ''');
 
@@ -510,6 +592,7 @@ class DatabaseHelper {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         aircraft_id INTEGER,
         mission_id INTEGER,
+        equipment_id INTEGER,
         battery_id TEXT NOT NULL,
         battery_type TEXT DEFAULT '',
         log_date TEXT NOT NULL,
@@ -561,6 +644,78 @@ class DatabaseHelper {
         takeoff_lon REAL,
         landing_lat REAL,
         landing_lon REAL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE equipment (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        equipment_code TEXT NOT NULL DEFAULT '',
+        name TEXT NOT NULL DEFAULT '',
+        type TEXT NOT NULL DEFAULT 'other',
+        serial_number TEXT NOT NULL DEFAULT '',
+        model TEXT NOT NULL DEFAULT '',
+        manufacturer TEXT NOT NULL DEFAULT '',
+        description TEXT NOT NULL DEFAULT '',
+        battery_type TEXT NOT NULL DEFAULT '',
+        capacity_mah INTEGER NOT NULL DEFAULT 0,
+        condition TEXT NOT NULL DEFAULT 'serviceable',
+        quantity INTEGER NOT NULL DEFAULT 1,
+        storage_location TEXT NOT NULL DEFAULT '',
+        purchase_date TEXT NOT NULL DEFAULT '',
+        notes TEXT NOT NULL DEFAULT '',
+        organization_id TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        is_synced INTEGER DEFAULT 0
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE mission_equipment (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        mission_id INTEGER NOT NULL,
+        equipment_id INTEGER NOT NULL,
+        purpose TEXT NOT NULL DEFAULT '',
+        notes TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE mission_documents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        mission_id INTEGER NOT NULL,
+        document_type TEXT NOT NULL,
+        permission_type TEXT NOT NULL DEFAULT '',
+        file_path TEXT NOT NULL DEFAULT '',
+        file_url TEXT NOT NULL DEFAULT '',
+        notes TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        is_synced INTEGER DEFAULT 0
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE checklist_timestamps (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        mission_id INTEGER NOT NULL,
+        checklist_type TEXT NOT NULL,
+        time_started TEXT NOT NULL DEFAULT '',
+        time_completed TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        UNIQUE(mission_id, checklist_type)
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE fit_to_fly_batteries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        mission_id INTEGER NOT NULL,
+        slot_index INTEGER NOT NULL,
+        equipment_id INTEGER,
+        battery_label TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        UNIQUE(mission_id, slot_index)
       )
     ''');
 
@@ -1288,6 +1443,132 @@ class DatabaseHelper {
       [batteryId],
     );
     return (rows.first['cnt'] as int?) ?? 0;
+  }
+
+  // ─── Equipment Locker ─────────────────────────────────────────────────────
+
+  Future<int> insertEquipment(Map<String, dynamic> data) async {
+    final db = await database;
+    return db.insert('equipment', data);
+  }
+
+  Future<void> updateEquipment(Map<String, dynamic> data) async {
+    final db = await database;
+    await db.update('equipment', data, where: 'id = ?', whereArgs: [data['id']]);
+  }
+
+  Future<void> deleteEquipment(int id) async {
+    final db = await database;
+    await db.delete('equipment', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<List<Map<String, dynamic>>> getEquipment() async {
+    final db = await database;
+    return db.query('equipment', orderBy: 'type ASC, name ASC');
+  }
+
+  Future<List<Map<String, dynamic>>> getEquipmentByType(String type) async {
+    final db = await database;
+    return db.query('equipment', where: 'type = ?', whereArgs: [type], orderBy: 'name ASC');
+  }
+
+  Future<String> generateEquipmentCode(String type) async {
+    final db = await database;
+    final prefix = switch (type) {
+      'battery'       => 'BAT',
+      'charger'       => 'CHG',
+      'ground_support' => 'GND',
+      'ppe'           => 'PPE',
+      'tool'          => 'TLS',
+      _               => 'EQP',
+    };
+    final rows = await db.rawQuery(
+      "SELECT COUNT(*) AS cnt FROM equipment WHERE type = ?", [type]);
+    final next = ((rows.first['cnt'] as int?) ?? 0) + 1;
+    return '$prefix-${next.toString().padLeft(3, '0')}';
+  }
+
+  // ─── Mission Equipment ─────────────────────────────────────────────────────
+
+  Future<void> saveMissionEquipment(int missionId, List<Map<String, dynamic>> items) async {
+    final db = await database;
+    await db.delete('mission_equipment', where: 'mission_id = ?', whereArgs: [missionId]);
+    for (final item in items) {
+      await db.insert('mission_equipment', {'mission_id': missionId, ...item});
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getMissionEquipment(int missionId) async {
+    final db = await database;
+    return db.rawQuery('''
+      SELECT me.*, e.equipment_code, e.name, e.type, e.serial_number,
+             e.model, e.battery_type, e.capacity_mah, e.condition
+      FROM mission_equipment me
+      JOIN equipment e ON me.equipment_id = e.id
+      WHERE me.mission_id = ?
+      ORDER BY e.type ASC, e.name ASC
+    ''', [missionId]);
+  }
+
+  // ─── Fit-to-Fly Battery Selections ────────────────────────────────────────
+
+  Future<void> saveFitToFlyBatteries(int missionId, List<Map<String, dynamic>> slots) async {
+    final db = await database;
+    await db.delete('fit_to_fly_batteries', where: 'mission_id = ?', whereArgs: [missionId]);
+    for (final slot in slots) {
+      await db.insert('fit_to_fly_batteries', {'mission_id': missionId, ...slot});
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getFitToFlyBatteries(int missionId) async {
+    final db = await database;
+    return db.query('fit_to_fly_batteries',
+        where: 'mission_id = ?', whereArgs: [missionId], orderBy: 'slot_index ASC');
+  }
+
+  // ─── Mission Documents ─────────────────────────────────────────────────────
+
+  Future<int> insertMissionDocument(Map<String, dynamic> data) async {
+    final db = await database;
+    return db.insert('mission_documents', data);
+  }
+
+  Future<void> deleteMissionDocument(int id) async {
+    final db = await database;
+    await db.delete('mission_documents', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<List<Map<String, dynamic>>> getMissionDocuments(int missionId) async {
+    final db = await database;
+    return db.query('mission_documents',
+        where: 'mission_id = ?', whereArgs: [missionId], orderBy: 'document_type ASC');
+  }
+
+  // ─── Checklist Timestamps ─────────────────────────────────────────────────
+
+  Future<void> saveChecklistTimestamp(int missionId, String type,
+      {String timeStarted = '', String timeCompleted = ''}) async {
+    final db = await database;
+    await db.insert(
+      'checklist_timestamps',
+      {
+        'mission_id': missionId,
+        'checklist_type': type,
+        'time_started': timeStarted,
+        'time_completed': timeCompleted,
+        'created_at': DateTime.now().toIso8601String(),
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<Map<String, dynamic>?> getChecklistTimestamp(int missionId, String type) async {
+    final db = await database;
+    final rows = await db.query('checklist_timestamps',
+        where: 'mission_id = ? AND checklist_type = ?',
+        whereArgs: [missionId, type],
+        limit: 1);
+    return rows.isEmpty ? null : rows.first;
   }
 
   // ─── Incident Reports ─────────────────────────────────────────────────────

@@ -5,7 +5,7 @@ import '../../providers/app_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/app_constants.dart';
 import 'base_checklist_screen.dart';
-import 'preflight_checklist_screen.dart';
+import '../fit_to_fly/fit_to_fly_screen.dart';
 import '../flight_log/flight_log_screen.dart';
 
 class PostflightChecklistScreen extends StatelessWidget {
@@ -113,10 +113,9 @@ class PostflightChecklistScreen extends StatelessWidget {
 
         if (anotherFlight == true) {
           Navigator.of(ctx).push(MaterialPageRoute(
-            builder: (_) => PreflightChecklistScreen(
+            builder: (_) => FitToFlyScreen(
               missionId: id,
               missionTitle: title,
-              flightNum: flightNum + 1,
             ),
           ));
         } else {

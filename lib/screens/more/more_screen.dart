@@ -8,6 +8,7 @@ import '../../theme/app_theme.dart';
 import '../../widgets/app_bar_title.dart';
 import '../aircraft/aircraft_screen.dart';
 import '../battery/battery_history_screen.dart';
+import '../equipment_locker/equipment_locker_screen.dart';
 import '../incidents/incident_history_screen.dart';
 import '../license/license_verification_screen.dart';
 import '../login_screen.dart';
@@ -75,6 +76,19 @@ class MoreScreen extends StatelessWidget {
                             style: TextStyle(
                                 color: context.colors.textMuted, fontSize: 11),
                           ),
+                        ],
+                        if (profile.isPersonal) ...[
+                          const SizedBox(height: 4),
+                          Row(children: [
+                            Icon(Icons.person_outline,
+                                size: 11, color: AppColors.primary),
+                            const SizedBox(width: 4),
+                            Text('Personal Account',
+                                style: TextStyle(
+                                    color: AppColors.primary,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600)),
+                          ]),
                         ],
                         if (profile.licenseNumber.isNotEmpty) ...[
                           const SizedBox(height: 4),
@@ -174,6 +188,14 @@ class MoreScreen extends StatelessWidget {
             iconColor: AppColors.success,
             onTap: () => Navigator.push(context,
                 MaterialPageRoute(builder: (_) => const BatteryHistoryScreen())),
+          ),
+          _NavTile(
+            icon: Icons.inventory_2_outlined,
+            title: 'Equipment Locker',
+            subtitle: 'Manage flight equipment inventory',
+            iconColor: const Color(0xFF80D8FF),
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const EquipmentLockerScreen())),
           ),
           _NavTile(
             icon: Icons.warning_amber_outlined,

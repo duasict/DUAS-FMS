@@ -32,6 +32,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _success         = false;
   String? _error;
 
+  String _accountType = 'organizational'; // 'organizational' | 'personal'
+  bool get _isPersonal => _accountType == 'personal';
+
   // UUID v4 pattern — org codes are Supabase UUIDs
   static final _uuidRe = RegExp(
     r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
@@ -55,8 +58,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
     final confirm = _confirmCtrl.text;
     final orgCode = _orgCodeCtrl.text.trim();
 
-    if (name.isEmpty || email.isEmpty || pass.isEmpty || orgCode.isEmpty) {
-      setState(() => _error = 'All fields are required.');
+    if (name.isEmpty || email.isEmpty || pass.isEmpty) {
+      setState(() => _error = 'Please fill in all required fields.');
+      return;
+    }
+    if (!_isPersonal && orgCode.isEmpty) {
+      setState(() => _error = 'Organization code is required.');
       return;
     }
     if (pass != confirm) {
@@ -67,7 +74,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       setState(() => _error = 'Password must be at least 6 characters.');
       return;
     }
-    if (!_uuidRe.hasMatch(orgCode)) {
+    if (!_isPersonal && !_uuidRe.hasMatch(orgCode)) {
       setState(() => _error =
           'Invalid organization code. Ask your CRP for the correct code.');
       return;
@@ -81,27 +88,24 @@ class _SignUpScreenState extends State<SignUpScreen> {
     try {
       final response = await SupabaseService.signUp(email, pass);
 
-      // Save name + org code locally so they are applied to the Supabase
-      // profile on first login (in case email confirmation is required and
-      // we don't have a session yet).
       await DatabaseHelper.instance.saveUserProfile(UserProfile(
         supabaseId: response.user?.id ?? '',
         name: name,
         email: email,
-        organizationId: orgCode,
+        organizationId: _isPersonal ? '' : orgCode,
         role: 'vo',
+        accountType: _accountType,
       ));
 
-      // If Supabase returned an immediate session (email confirmation
-      // disabled), push the profile data now.
       if (response.session != null && response.user != null) {
         try {
           await SupabaseService.upsertProfile({
             'id': response.user!.id,
             'name': name,
-            'organization_id': orgCode,
+            'organization_id': _isPersonal ? null : orgCode,
             'email': email,
             'role': 'vo',
+            'account_type': _accountType,
           });
         } catch (_) {
           // Non-fatal — will be applied on first login
@@ -205,11 +209,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 fontSize: 24,
                 fontWeight: FontWeight.w700)),
         const SizedBox(height: 4),
-        Text('You will need an organization code from your CRP.',
-            style: TextStyle(
-                color: context.colors.textSecondary, fontSize: 13)),
+        Text(
+          _isPersonal
+              ? 'Create a personal account for individual use.'
+              : 'You will need an organization code from your CRP.',
+          style: TextStyle(color: context.colors.textSecondary, fontSize: 13),
+        ),
 
-        const SizedBox(height: 28),
+        const SizedBox(height: 20),
+        _accountTypeSelector(context),
+        const SizedBox(height: 20),
 
         // Full name
         _field(
@@ -252,27 +261,27 @@ class _SignUpScreenState extends State<SignUpScreen> {
         ),
         const SizedBox(height: 14),
 
-        // Org code
-        TextField(
-          controller: _orgCodeCtrl,
-          style:
-              TextStyle(color: context.colors.textPrimary, fontSize: 13),
-          textInputAction: TextInputAction.done,
-          onSubmitted: (_) => _signUp(),
-          decoration: InputDecoration(
-            labelText: 'Organization Code',
-            hintText: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
-            hintStyle: TextStyle(
-                color: context.colors.textMuted,
-                fontSize: 11,
-                fontFamily: 'monospace'),
-            prefixIcon: Icon(Icons.key_outlined,
-                color: context.colors.textMuted, size: 18),
-            helperText: 'Ask your CRP for this code.',
-            helperStyle:
-                TextStyle(color: context.colors.textMuted, fontSize: 11),
+        // Org code — organizational accounts only
+        if (!_isPersonal)
+          TextField(
+            controller: _orgCodeCtrl,
+            style: TextStyle(color: context.colors.textPrimary, fontSize: 13),
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _signUp(),
+            decoration: InputDecoration(
+              labelText: 'Organization Code',
+              hintText: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
+              hintStyle: TextStyle(
+                  color: context.colors.textMuted,
+                  fontSize: 11,
+                  fontFamily: 'monospace'),
+              prefixIcon: Icon(Icons.key_outlined,
+                  color: context.colors.textMuted, size: 18),
+              helperText: 'Ask your CRP for this code.',
+              helperStyle:
+                  TextStyle(color: context.colors.textMuted, fontSize: 11),
+            ),
           ),
-        ),
 
         // Error banner
         if (_error != null) ...[
@@ -332,6 +341,48 @@ class _SignUpScreenState extends State<SignUpScreen> {
           ),
         ]),
       ],
+      ),
+    );
+  }
+
+  Widget _accountTypeSelector(BuildContext context) {
+    return Row(children: [
+      Expanded(child: _typeChip(context, 'organizational', Icons.corporate_fare_outlined, 'Organization')),
+      const SizedBox(width: 10),
+      Expanded(child: _typeChip(context, 'personal', Icons.person_outline, 'Personal')),
+    ]);
+  }
+
+  Widget _typeChip(BuildContext context, String type, IconData icon, String label) {
+    final selected = _accountType == type;
+    return GestureDetector(
+      onTap: () => setState(() => _accountType = type),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.primary.withValues(alpha: 0.12)
+              : context.colors.surface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: selected ? AppColors.primary : context.colors.border,
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon,
+              size: 22,
+              color: selected ? AppColors.primary : context.colors.textMuted),
+          const SizedBox(height: 5),
+          Text(label,
+              style: TextStyle(
+                  color: selected
+                      ? AppColors.primary
+                      : context.colors.textSecondary,
+                  fontSize: 12,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w400)),
+        ]),
       ),
     );
   }

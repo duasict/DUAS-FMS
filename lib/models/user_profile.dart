@@ -17,7 +17,8 @@ class UserProfile {
   final bool faceVerified;          // true = selfie matched ID photo
   final String phone;
   final String? photoPath;
-  final String organizationId; // Supabase organization UUID (empty = not linked)
+  final String organizationId; // Supabase organization UUID (empty for personal accounts)
+  final String accountType;   // 'organizational' | 'personal'
 
   const UserProfile({
     this.id,
@@ -33,6 +34,7 @@ class UserProfile {
     this.phone = '',
     this.photoPath,
     this.organizationId = '',
+    this.accountType = 'organizational',
   });
 
   factory UserProfile.fromMap(Map<String, dynamic> m) => UserProfile(
@@ -54,6 +56,7 @@ class UserProfile {
             ? null
             : m['photo_path'] as String?,
         organizationId: m['organization_id'] as String? ?? '',
+        accountType: m['account_type'] as String? ?? 'organizational',
       );
 
   Map<String, dynamic> toMap() => {
@@ -70,6 +73,7 @@ class UserProfile {
         'phone': phone,
         'photo_path': photoPath ?? '',
         'organization_id': organizationId,
+        'account_type': accountType,
       };
 
   UserProfile copyWith({
@@ -87,6 +91,7 @@ class UserProfile {
     String? photoPath,
     bool clearPhoto = false,
     String? organizationId,
+    String? accountType,
   }) =>
       UserProfile(
         id: id,
@@ -104,6 +109,7 @@ class UserProfile {
         phone: phone ?? this.phone,
         photoPath: clearPhoto ? null : (photoPath ?? this.photoPath),
         organizationId: organizationId ?? this.organizationId,
+        accountType: accountType ?? this.accountType,
       );
 
   // ── Computed ───────────────────────────────────────────────────────────────
@@ -155,6 +161,8 @@ class UserProfile {
   /// True when this profile qualifies for PIC/RPIC mission assignment.
   bool get isEligibleRpic =>
       licenseVerified && licenseNumber.isNotEmpty && !isLicenseExpired;
+
+  bool get isPersonal => accountType == 'personal';
 
   // ── Private helpers ────────────────────────────────────────────────────────
 

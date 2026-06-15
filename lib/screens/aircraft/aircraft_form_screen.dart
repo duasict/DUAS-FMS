@@ -23,6 +23,7 @@ class _AircraftFormScreenState extends State<AircraftFormScreen> {
   String _type = 'multi-rotor';
   String _status = 'serviceable';
   String _photoPath = '';
+  int _batteriesNeeded = 1;
   bool _isSaving = false;
 
   bool get _isEdit => widget.aircraft != null;
@@ -53,6 +54,7 @@ class _AircraftFormScreenState extends State<AircraftFormScreen> {
       _type = a.type;
       _status = a.status;
       _photoPath = a.photoPath;
+      _batteriesNeeded = a.batteriesNeeded;
     }
   }
 
@@ -91,6 +93,7 @@ class _AircraftFormScreenState extends State<AircraftFormScreen> {
       mtow: mtow,
       status: _status,
       photoPath: _photoPath,
+      batteriesNeeded: _batteriesNeeded,
     );
 
     if (_isEdit) {
@@ -220,6 +223,8 @@ class _AircraftFormScreenState extends State<AircraftFormScreen> {
             keyboardType:
                 const TextInputType.numberWithOptions(decimal: true),
           ),
+          const SizedBox(height: 14),
+          _batteryStepper(),
           const SizedBox(height: 24),
           _sectionLabel('STATUS'),
           const SizedBox(height: 10),
@@ -261,6 +266,45 @@ class _AircraftFormScreenState extends State<AircraftFormScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _batteryStepper() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: context.colors.border),
+      ),
+      child: Row(children: [
+        Icon(Icons.battery_full_outlined, size: 18, color: context.colors.textMuted),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Batteries Needed',
+                style: TextStyle(color: context.colors.textPrimary, fontSize: 14)),
+            Text('Battery slots shown in Fit-to-Fly',
+                style: TextStyle(color: context.colors.textMuted, fontSize: 11)),
+          ]),
+        ),
+        _StepperButton(
+          icon: Icons.remove,
+          onTap: _batteriesNeeded > 1 ? () => setState(() => _batteriesNeeded--) : null,
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text('$_batteriesNeeded',
+              style: TextStyle(
+                  color: context.colors.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700)),
+        ),
+        _StepperButton(
+          icon: Icons.add,
+          onTap: _batteriesNeeded < 8 ? () => setState(() => _batteriesNeeded++) : null,
+        ),
+      ]),
     );
   }
 
@@ -406,6 +450,36 @@ class _AircraftFormScreenState extends State<AircraftFormScreen> {
           ),
         );
       }),
+    );
+  }
+}
+
+class _StepperButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onTap;
+  const _StepperButton({required this.icon, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          color: enabled
+              ? AppColors.primary.withValues(alpha: 0.12)
+              : context.colors.surface,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: enabled ? AppColors.primary.withValues(alpha: 0.4) : context.colors.border,
+          ),
+        ),
+        child: Icon(icon,
+            size: 16,
+            color: enabled ? AppColors.primary : context.colors.textMuted),
+      ),
     );
   }
 }

@@ -27,6 +27,7 @@ class Mission {
   String? createdBy;     // Supabase user UUID of CRP who created this
 
   // Step completion flags
+  bool hasDocumentsComplete;
   bool hasFlightPlanComplete;
   bool hasHiraComplete;
   bool hasEquipmentComplete;
@@ -65,6 +66,7 @@ class Mission {
     this.crpConcurrenceStatus = '',
     this.organizationId = '',
     this.createdBy,
+    this.hasDocumentsComplete = false,
     this.hasFlightPlanComplete = false,
     this.hasHiraComplete = false,
     this.hasEquipmentComplete = false,
@@ -106,6 +108,7 @@ class Mission {
       crpConcurrenceStatus: map['crp_concurrence_status'] as String? ?? '',
       organizationId: map['organization_id'] as String? ?? '',
       createdBy: map['created_by'] as String?,
+      hasDocumentsComplete: (map['has_documents_complete'] as int?) == 1,
       hasFlightPlanComplete: (map['has_flight_plan_complete'] as int?) == 1,
       hasHiraComplete: (map['has_hira_complete'] as int?) == 1,
       hasEquipmentComplete: (map['has_equipment_complete'] as int?) == 1,
@@ -160,6 +163,7 @@ class Mission {
     String? crpConcurrenceStatus,
     String? organizationId,
     String? createdBy,
+    bool? hasDocumentsComplete,
     bool? hasFlightPlanComplete,
     bool? hasHiraComplete,
     bool? hasEquipmentComplete,
@@ -196,6 +200,7 @@ class Mission {
         crpConcurrenceStatus: crpConcurrenceStatus ?? this.crpConcurrenceStatus,
         organizationId: organizationId ?? this.organizationId,
         createdBy: createdBy ?? this.createdBy,
+        hasDocumentsComplete: hasDocumentsComplete ?? this.hasDocumentsComplete,
         hasFlightPlanComplete:
             hasFlightPlanComplete ?? this.hasFlightPlanComplete,
         hasHiraComplete: hasHiraComplete ?? this.hasHiraComplete,
@@ -235,6 +240,7 @@ class Mission {
       'crp_concurrence_status': crpConcurrenceStatus,
       'organization_id': organizationId,
       'created_by': createdBy,
+      'has_documents_complete': hasDocumentsComplete ? 1 : 0,
       'has_flight_plan_complete': hasFlightPlanComplete ? 1 : 0,
       'has_hira_complete': hasHiraComplete ? 1 : 0,
       'has_equipment_complete': hasEquipmentComplete ? 1 : 0,

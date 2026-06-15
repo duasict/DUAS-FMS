@@ -12,6 +12,8 @@ import 'checklist_widgets.dart';
 /// [stepIndex]         — 0-based index for ChecklistProgressBar
 /// [steps]             — optional step labels; defaults to the 4-step flight steps
 /// [submitLabel]       — text shown on the submit button
+/// [captureTimestamps] — when true, records time_started on load and time_completed on submit
+/// [extraSections]     — optional builder for additional widgets prepended before checklist sections
 /// [onSubmitComplete]  — called after DB save; receives (context, missionId, missionTitle)
 ///                       and is responsible for the mission flag update and navigation
 class BaseChecklistScreen extends StatefulWidget {
@@ -22,6 +24,8 @@ class BaseChecklistScreen extends StatefulWidget {
   final int stepIndex;
   final List<String>? steps;
   final String submitLabel;
+  final bool captureTimestamps;
+  final List<Widget> Function()? extraSections;
   final Future<void> Function(
       BuildContext context, int missionId, String missionTitle) onSubmitComplete;
 
@@ -34,6 +38,8 @@ class BaseChecklistScreen extends StatefulWidget {
     required this.stepIndex,
     this.steps,
     required this.submitLabel,
+    this.captureTimestamps = false,
+    this.extraSections,
     required this.onSubmitComplete,
   });
 
@@ -45,6 +51,7 @@ class _BaseChecklistScreenState extends State<BaseChecklistScreen> {
   bool _isLoading = true;
   bool _isSaving = false;
   late final List<ChecklistEntry> _items;
+  String _timeStarted = '';
 
   @override
   void initState() {
@@ -56,14 +63,27 @@ class _BaseChecklistScreenState extends State<BaseChecklistScreen> {
   }
 
   Future<void> _loadExisting() async {
-    final saved = await DatabaseHelper.instance
-        .getChecklistItems(widget.missionId, widget.checklistType);
+    final db = DatabaseHelper.instance;
+    final saved = await db.getChecklistItems(widget.missionId, widget.checklistType);
     if (saved.isNotEmpty) {
       for (var i = 0; i < saved.length && i < _items.length; i++) {
         _items[i].status = saved[i].status;
         _items[i].remark = saved[i].remark;
       }
     }
+
+    if (widget.captureTimestamps) {
+      final existing = await db.getChecklistTimestamp(widget.missionId, widget.checklistType);
+      final savedStart = existing?['time_started'] as String? ?? '';
+      if (savedStart.isNotEmpty) {
+        _timeStarted = savedStart;
+      } else {
+        final now = DateTime.now();
+        _timeStarted =
+            '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+      }
+    }
+
     if (mounted) setState(() => _isLoading = false);
   }
 
@@ -71,6 +91,17 @@ class _BaseChecklistScreenState extends State<BaseChecklistScreen> {
 
   Future<void> _submit() async {
     setState(() => _isSaving = true);
+
+    if (widget.captureTimestamps) {
+      final now = DateTime.now();
+      final timeCompleted =
+          '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+      await DatabaseHelper.instance.saveChecklistTimestamp(
+        widget.missionId, widget.checklistType,
+        timeStarted: _timeStarted,
+        timeCompleted: timeCompleted,
+      );
+    }
 
     final dbItems = _items.asMap().entries.map((e) {
       return ChecklistItem(
@@ -131,7 +162,12 @@ class _BaseChecklistScreenState extends State<BaseChecklistScreen> {
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 100),
               children: [
                 ChecklistMissionBanner(title: widget.missionTitle),
+                if (widget.captureTimestamps && _timeStarted.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  _TimestampBanner(timeStarted: _timeStarted),
+                ],
                 const SizedBox(height: 12),
+                if (widget.extraSections != null) ...widget.extraSections!(),
                 ..._buildSections(),
               ],
             ),
@@ -181,4 +217,30 @@ class _BaseChecklistScreenState extends State<BaseChecklistScreen> {
   String _titleFor(String type) => _checklistMeta[type]?.$1 ?? 'Checklist';
 
   String _subtitleFor(String type) => _checklistMeta[type]?.$2 ?? 'Annex A compliance checklist';
+}
+
+class _TimestampBanner extends StatelessWidget {
+  final String timeStarted;
+  const _TimestampBanner({required this.timeStarted});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+      ),
+      child: Row(children: [
+        Icon(Icons.access_time_outlined, size: 13, color: AppColors.primary),
+        const SizedBox(width: 7),
+        Text('Started: $timeStarted',
+            style: const TextStyle(
+                color: AppColors.primary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600)),
+      ]),
+    );
+  }
 }
