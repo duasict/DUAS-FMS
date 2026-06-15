@@ -23,7 +23,6 @@ class EquipmentChecklistScreen extends StatefulWidget {
 class _EquipmentChecklistScreenState extends State<EquipmentChecklistScreen> {
   List<EquipmentItem> _allEquipment = [];
   final Set<int> _selectedIds = {};
-  bool _equipmentLoaded = false;
 
   static const _defs = [
     ('A. LI-ION BATTERIES', 'Battery cells ≥3.8V/cell, no swelling or damage'),
@@ -58,7 +57,6 @@ class _EquipmentChecklistScreenState extends State<EquipmentChecklistScreen> {
       setState(() {
         _allEquipment = rows.map(EquipmentItem.fromMap).toList();
         _selectedIds.addAll(existingIds);
-        _equipmentLoaded = true;
       });
     }
   }
@@ -78,7 +76,6 @@ class _EquipmentChecklistScreenState extends State<EquipmentChecklistScreen> {
   }
 
   List<Widget> _buildEquipmentSection() {
-    if (!_equipmentLoaded) return [];
     return [
       ChecklistSectionHeader(label: 'E. EQUIPMENT USED'),
       if (_allEquipment.isEmpty)

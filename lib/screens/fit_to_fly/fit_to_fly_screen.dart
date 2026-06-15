@@ -5,6 +5,7 @@ import '../../models/equipment_item.dart';
 import '../../utils/app_constants.dart';
 import '../../models/checklist_item.dart';
 import '../../models/crew_member.dart';
+import '../../models/mission.dart';
 import '../../providers/app_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/app_bar_title.dart';
@@ -86,31 +87,41 @@ class _FitToFlyScreenState extends State<FitToFlyScreen> {
   Future<void> _loadExisting() async {
     final db = DatabaseHelper.instance;
 
-    // Load mission data
-    final mission = await db.getMissionById(widget.missionId);
+    final results = await Future.wait([
+      db.getMissionById(widget.missionId),
+      db.getCrewForMission(widget.missionId),
+      db.getFitToFlyRecord(widget.missionId),
+      db.getChecklistItems(widget.missionId, 'fittofly'),
+      db.getChecklistTimestamp(widget.missionId, 'fittofly'),
+      db.getMissionEquipment(widget.missionId),
+      db.getFitToFlyBatteries(widget.missionId),
+    ]);
+
+    final mission      = results[0] as Mission?;
+    final crew         = results[1] as List<CrewMember>;
+    final savedRecord  = results[2] as Map<String, dynamic>?;
+    final savedItems   = results[3] as List<ChecklistItem>;
+    final ts           = results[4] as Map<String, dynamic>?;
+    final missionEquip = results[5] as List<Map<String, dynamic>>;
+    final savedSlots   = results[6] as List<Map<String, dynamic>>;
+
     if (mission != null) {
       _dateCtrl.text     = mission.date;
       _timeCtrl.text     = mission.timeStr;
       _locationCtrl.text = mission.location;
       _rpaModelCtrl.text = mission.aircraftName;
-
-      // Determine batteries needed from aircraft
       if (mission.aircraftId != null) {
         final aircraft = await db.getAircraftById(mission.aircraftId!);
         if (aircraft != null) _batteriesNeeded = aircraft.batteriesNeeded;
       }
     }
 
-    // Auto-populate PIC from mission RPIC crew member
-    final crew = await db.getCrewForMission(widget.missionId);
     final rpic = crew.firstWhere(
       (c) => c.role.toLowerCase() == 'rpic',
       orElse: () => CrewMember(missionId: widget.missionId, name: '', role: ''),
     );
     if (rpic.name.isNotEmpty) _picCtrl.text = rpic.name;
 
-    // Load saved fit-to-fly record
-    final savedRecord = await db.getFitToFlyRecord(widget.missionId);
     if (savedRecord != null) {
       _dateCtrl.text        = savedRecord['record_date'] ?? _dateCtrl.text;
       _timeCtrl.text        = savedRecord['record_time'] ?? _timeCtrl.text;
@@ -122,8 +133,6 @@ class _FitToFlyScreenState extends State<FitToFlyScreen> {
       _picCtrl.text         = savedRecord['pic'] ?? _picCtrl.text;
     }
 
-    // Load checklist items
-    final savedItems = await db.getChecklistItems(widget.missionId, 'fittofly');
     if (savedItems.isNotEmpty) {
       for (var i = 0; i < savedItems.length && i < _sectionB.length; i++) {
         _sectionB[i].status = savedItems[i].status;
@@ -131,8 +140,6 @@ class _FitToFlyScreenState extends State<FitToFlyScreen> {
       }
     }
 
-    // Load timestamps
-    final ts = await db.getChecklistTimestamp(widget.missionId, 'fittofly');
     final savedStart = ts?['time_started'] as String? ?? '';
     if (savedStart.isNotEmpty) {
       _timeStarted = savedStart;
@@ -142,22 +149,16 @@ class _FitToFlyScreenState extends State<FitToFlyScreen> {
           '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
     }
 
-    // Load available batteries (from mission equipment, filtered to batteries)
-    final missionEquipment = await db.getMissionEquipment(widget.missionId);
-    _availableBatteries = missionEquipment
+    _availableBatteries = missionEquip
         .where((e) => e['type'] == 'battery')
         .map(EquipmentItem.fromMap)
         .toList();
-
-    // If no mission batteries selected, fall back to all locker batteries
     if (_availableBatteries.isEmpty) {
       final all = await db.getEquipmentByType('battery');
       _availableBatteries = all.map(EquipmentItem.fromMap).toList();
     }
 
-    // Load saved battery slot selections
     _selectedBatteryIds = List.filled(_batteriesNeeded, null);
-    final savedSlots = await db.getFitToFlyBatteries(widget.missionId);
     for (final slot in savedSlots) {
       final idx = slot['slot_index'] as int? ?? 0;
       if (idx < _batteriesNeeded) {
@@ -188,49 +189,45 @@ class _FitToFlyScreenState extends State<FitToFlyScreen> {
     final provider = context.read<AppProvider>();
     final navigator = Navigator.of(context);
 
-    // Save timestamps
     final now = DateTime.now();
     final timeCompleted =
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
-    await DatabaseHelper.instance.saveChecklistTimestamp(
-      widget.missionId, 'fittofly',
-      timeStarted: _timeStarted,
-      timeCompleted: timeCompleted,
-    );
 
-    // Save Fit-to-Fly record
-    await DatabaseHelper.instance.saveFitToFlyRecord({
-      'mission_id':    widget.missionId,
-      'record_date':   _dateCtrl.text.trim(),
-      'record_time':   _timeCtrl.text.trim(),
-      'location':      _locationCtrl.text.trim(),
-      'mission_type':  _missionTypeCtrl.text.trim(),
-      'rpa_model':     _rpaModelCtrl.text.trim(),
-      'serial_number': _serialCtrl.text.trim(),
-      'payload':       _payloadCtrl.text.trim(),
-      'pic':           _picCtrl.text.trim(),
-    });
+    final slots = [
+      for (var i = 0; i < _selectedBatteryIds.length; i++)
+        {'slot_index': i, 'equipment_id': _selectedBatteryIds[i], 'battery_label': ''},
+    ];
 
-    // Save battery slot selections
-    final slots = <Map<String, dynamic>>[];
-    for (var i = 0; i < _selectedBatteryIds.length; i++) {
-      slots.add({'slot_index': i, 'equipment_id': _selectedBatteryIds[i], 'battery_label': ''});
-    }
-    await DatabaseHelper.instance.saveFitToFlyBatteries(widget.missionId, slots);
+    final dbItems = _sectionB.asMap().entries.map((e) => ChecklistItem(
+      missionId: widget.missionId,
+      checklistType: 'fittofly',
+      section: e.value.section,
+      itemIndex: e.key,
+      itemText: e.value.text,
+      status: e.value.status,
+      remark: e.value.remark,
+    )).toList();
 
-    // Save checklist items
-    final dbItems = _sectionB.asMap().entries.map((e) {
-      return ChecklistItem(
-        missionId: widget.missionId,
-        checklistType: 'fittofly',
-        section: e.value.section,
-        itemIndex: e.key,
-        itemText: e.value.text,
-        status: e.value.status,
-        remark: e.value.remark,
-      );
-    }).toList();
-    await DatabaseHelper.instance.saveChecklistItems(dbItems);
+    await Future.wait([
+      DatabaseHelper.instance.saveChecklistTimestamp(
+        widget.missionId, 'fittofly',
+        timeStarted: _timeStarted,
+        timeCompleted: timeCompleted,
+      ),
+      DatabaseHelper.instance.saveFitToFlyRecord({
+        'mission_id':    widget.missionId,
+        'record_date':   _dateCtrl.text.trim(),
+        'record_time':   _timeCtrl.text.trim(),
+        'location':      _locationCtrl.text.trim(),
+        'mission_type':  _missionTypeCtrl.text.trim(),
+        'rpa_model':     _rpaModelCtrl.text.trim(),
+        'serial_number': _serialCtrl.text.trim(),
+        'payload':       _payloadCtrl.text.trim(),
+        'pic':           _picCtrl.text.trim(),
+      }),
+      DatabaseHelper.instance.saveFitToFlyBatteries(widget.missionId, slots),
+      DatabaseHelper.instance.saveChecklistItems(dbItems),
+    ]);
 
     final mission = await DatabaseHelper.instance.getMissionById(widget.missionId);
     if (mission != null) {
@@ -270,16 +267,12 @@ class _FitToFlyScreenState extends State<FitToFlyScreen> {
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 100),
               children: [
                 ChecklistMissionBanner(title: widget.missionTitle),
-                if (_timeStarted.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  _TimestampBadge(timeStarted: _timeStarted),
-                ],
+                const SizedBox(height: 8),
+                _TimestampBadge(timeStarted: _timeStarted),
                 const SizedBox(height: 12),
                 _sectionACard(),
-                if (_batteriesNeeded > 0) ...[
-                  const SizedBox(height: 8),
-                  _batterySelectionCard(),
-                ],
+                const SizedBox(height: 8),
+                _batterySelectionCard(),
                 const SizedBox(height: 4),
                 ..._buildSectionB(),
               ],

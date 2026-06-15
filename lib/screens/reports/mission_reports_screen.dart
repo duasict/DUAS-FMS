@@ -1,8 +1,8 @@
-import 'dart:convert';
-import 'dart:math';
 import 'dart:typed_data';
 import 'package:archive/archive_io.dart';
 import 'package:flutter/material.dart';
+import '../../utils/geo_utils.dart';
+import '../../widgets/mission_document_row.dart';
 import '../../database/database_helper.dart';
 import '../../models/checklist_item.dart';
 import '../../models/crew_member.dart';
@@ -49,35 +49,8 @@ class _MissionReportsScreenState
   final Set<String> _selectedForms = {};
 
   // ── Coverage area ──────────────────────────────────────────────────────────
-  double get _coverageAreaHa {
-    final geoJson = _flightPlan?.coverageAreaGeoJson;
-    if (geoJson == null) return 0;
-    try {
-      final d = jsonDecode(geoJson) as Map<String, dynamic>;
-      final type = d['type'] as String?;
-      List<dynamic> coords;
-      if (type == 'Polygon') {
-        coords = (d['coordinates'] as List).first as List;
-      } else if (type == 'Feature') {
-        coords = ((d['geometry'] as Map)['coordinates'] as List).first as List;
-      } else {
-        return 0;
-      }
-      const R = 6371000.0;
-      double area = 0;
-      for (int i = 0; i < coords.length; i++) {
-        final j = (i + 1) % coords.length;
-        final lonI = (coords[i][0] as num).toDouble() * pi / 180;
-        final latI = (coords[i][1] as num).toDouble() * pi / 180;
-        final lonJ = (coords[j][0] as num).toDouble() * pi / 180;
-        final latJ = (coords[j][1] as num).toDouble() * pi / 180;
-        area += (lonJ - lonI) * (2 + sin(latI) + sin(latJ));
-      }
-      return (area.abs() * R * R / 2) / 10000;
-    } catch (_) {
-      return 0;
-    }
-  }
+  double get _coverageAreaHa =>
+      calcAreaHa(_flightPlan?.coverageAreaGeoJson ?? '');
 
   @override
   void initState() {
@@ -564,12 +537,8 @@ class _MissionReportsScreenState
   // ── Widgets ───────────────────────────────────────────────────────────────
 
   Widget _missionCard(Mission m) {
-    final ha = _coverageAreaHa;
-    final areaStr = ha > 0
-        ? ha >= 100
-            ? '${(ha / 100).toStringAsFixed(2)} km²'
-            : '${ha.toStringAsFixed(2)} ha'
-        : null;
+    final area = formatAreaHa(_coverageAreaHa);
+    final areaStr = area.isEmpty ? null : area;
     final rpic = _crew.where((c) => c.role.toLowerCase() == 'rpic').firstOrNull;
 
     return Container(
@@ -733,16 +702,6 @@ class _MissionReportsScreenState
   }
 
   Widget _submittedDocsTile(BuildContext context) {
-    const typeLabels = {
-      'travel_order': 'Travel Order',
-      'site_permission': 'Site Permission',
-      'property_owner': 'Property Owner',
-    };
-    const typeIcons = {
-      'travel_order': Icons.description_outlined,
-      'site_permission': Icons.verified_outlined,
-      'property_owner': Icons.house_outlined,
-    };
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -752,51 +711,12 @@ class _MissionReportsScreenState
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: _documents.map((doc) {
-          final type = doc['document_type'] as String? ?? '';
-          final permType = doc['permission_type'] as String? ?? '';
-          final path = doc['file_path'] as String? ?? '';
-          final name = path.isNotEmpty
-              ? path.split('/').last.split('\\').last
-              : '—';
-          final isPdf = name.toLowerCase().endsWith('.pdf');
-          final label = typeLabels[type] ?? type;
-          final icon = typeIcons[type] ?? Icons.insert_drive_file_outlined;
-          final subtitle = (type == 'site_permission' && permType.isNotEmpty)
-              ? permType
-              : null;
-          return Padding(
-            padding: EdgeInsets.only(
-                bottom: doc == _documents.last ? 0 : 10),
-            child: Row(children: [
-              Icon(icon, size: 15, color: context.colors.textMuted),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                  Text(subtitle != null ? '$label — $subtitle' : label,
-                      style: TextStyle(
-                          color: context.colors.textSecondary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500)),
-                  Text(name,
-                      style: TextStyle(
-                          color: context.colors.textMuted, fontSize: 11),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis),
-                ]),
-              ),
-              Icon(
-                  isPdf
-                      ? Icons.picture_as_pdf_outlined
-                      : Icons.image_outlined,
-                  size: 13,
-                  color:
-                      isPdf ? AppColors.danger : context.colors.textMuted),
-            ]),
-          );
-        }).toList(),
+        children: [
+          for (var i = 0; i < _documents.length; i++) ...[
+            MissionDocumentRow(doc: _documents[i], allowOpen: true),
+            if (i < _documents.length - 1) const SizedBox(height: 10),
+          ],
+        ],
       ),
     );
   }

@@ -1,8 +1,8 @@
-import 'dart:convert';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/flight_plan.dart';
+import '../../utils/geo_utils.dart';
+import '../../widgets/mission_document_row.dart';
 import '../../models/mission.dart';
 import '../../models/crew_member.dart';
 import '../../models/user_profile.dart';
@@ -77,6 +77,8 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
     final m = _mission!;
     final id = m.id!;
     final title = m.title;
+    final flightCount =
+        await DatabaseHelper.instance.getMissionFlightCount(id);
 
     Widget next;
     if (!m.hasDocumentsComplete) {
@@ -90,22 +92,18 @@ class _MissionDetailsScreenState extends State<MissionDetailsScreen> {
     } else if (!m.hasFitToFlyComplete) {
       next = FitToFlyScreen(missionId: id, missionTitle: title);
     } else if (!m.hasPreflightComplete) {
-      final flightNum =
-          await DatabaseHelper.instance.getMissionFlightCount(id) + 1;
       next = PreflightChecklistScreen(
-          missionId: id, missionTitle: title, flightNum: flightNum);
+          missionId: id, missionTitle: title, flightNum: flightCount + 1);
     } else if (!m.hasInflightComplete) {
-      final flightNum = await DatabaseHelper.instance.getMissionFlightCount(id);
       next = InflightChecklistScreen(
           missionId: id,
           missionTitle: title,
-          flightNum: flightNum > 0 ? flightNum : 1);
+          flightNum: flightCount > 0 ? flightCount : 1);
     } else if (!m.hasPostflightComplete) {
-      final flightNum = await DatabaseHelper.instance.getMissionFlightCount(id);
       next = PostflightChecklistScreen(
           missionId: id,
           missionTitle: title,
-          flightNum: flightNum > 0 ? flightNum : 1);
+          flightNum: flightCount > 0 ? flightCount : 1);
     } else if (!m.hasFlightlogComplete) {
       next = FlightLogScreen(missionId: id, missionTitle: title);
     } else {
@@ -1030,18 +1028,6 @@ class _DocumentsCard extends StatelessWidget {
   final VoidCallback onEdit;
   const _DocumentsCard({required this.documents, required this.onEdit});
 
-  static const _typeLabels = {
-    'travel_order': 'Travel Order',
-    'site_permission': 'Site Permission',
-    'property_owner': 'Property Owner',
-  };
-
-  static const _typeIcons = {
-    'travel_order': Icons.description_outlined,
-    'site_permission': Icons.verified_outlined,
-    'property_owner': Icons.house_outlined,
-  };
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1074,44 +1060,11 @@ class _DocumentsCard extends StatelessWidget {
         ]),
         const SizedBox(height: 10),
         for (final doc in documents) ...[
-          _docRow(context, doc),
+          MissionDocumentRow(doc: doc),
           if (doc != documents.last) const SizedBox(height: 6),
         ],
       ]),
     );
-  }
-
-  Widget _docRow(BuildContext context, Map<String, dynamic> doc) {
-    final type = doc['document_type'] as String? ?? '';
-    final permType = doc['permission_type'] as String? ?? '';
-    final path = doc['file_path'] as String? ?? '';
-    final name = path.isNotEmpty ? path.split('/').last.split('\\').last : '—';
-    final isPdf = name.toLowerCase().endsWith('.pdf');
-    final label = _typeLabels[type] ?? type;
-    final icon = _typeIcons[type] ?? Icons.insert_drive_file_outlined;
-    final subtitle =
-        (type == 'site_permission' && permType.isNotEmpty) ? permType : null;
-
-    return Row(children: [
-      Icon(icon, size: 15, color: context.colors.textMuted),
-      const SizedBox(width: 8),
-      Expanded(
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(subtitle != null ? '$label — $subtitle' : label,
-              style: TextStyle(
-                  color: context.colors.textSecondary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500)),
-          Text(name,
-              style: TextStyle(color: context.colors.textMuted, fontSize: 11),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis),
-        ]),
-      ),
-      Icon(isPdf ? Icons.picture_as_pdf_outlined : Icons.image_outlined,
-          size: 13,
-          color: isPdf ? AppColors.danger : context.colors.textMuted),
-    ]);
   }
 }
 
@@ -1121,43 +1074,10 @@ class _CoverageAreaCard extends StatelessWidget {
   final String geoJson;
   const _CoverageAreaCard({required this.geoJson});
 
-  double _calcAreaHa() {
-    try {
-      final decoded = jsonDecode(geoJson) as Map<String, dynamic>;
-      final type = decoded['type'] as String?;
-      List<dynamic> coords;
-      if (type == 'Polygon') {
-        coords = (decoded['coordinates'] as List).first as List;
-      } else if (type == 'Feature') {
-        final geo = decoded['geometry'] as Map<String, dynamic>;
-        coords = (geo['coordinates'] as List).first as List;
-      } else {
-        return 0;
-      }
-      const R = 6371000.0;
-      double area = 0;
-      for (int i = 0; i < coords.length; i++) {
-        final j = (i + 1) % coords.length;
-        final lonI = (coords[i][0] as num).toDouble() * pi / 180;
-        final latI = (coords[i][1] as num).toDouble() * pi / 180;
-        final lonJ = (coords[j][0] as num).toDouble() * pi / 180;
-        final latJ = (coords[j][1] as num).toDouble() * pi / 180;
-        area += (lonJ - lonI) * (2 + sin(latI) + sin(latJ));
-      }
-      return (area.abs() * R * R / 2) / 10000;
-    } catch (_) {
-      return 0;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final ha = _calcAreaHa();
-    final areaStr = ha > 0
-        ? ha >= 100
-            ? '${(ha / 100).toStringAsFixed(2)} km²'
-            : '${ha.toStringAsFixed(2)} ha'
-        : 'Plotted';
+    final ha = calcAreaHa(geoJson);
+    final areaStr = ha > 0 ? formatAreaHa(ha) : 'Plotted';
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 5),

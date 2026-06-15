@@ -162,12 +162,12 @@ class _BaseChecklistScreenState extends State<BaseChecklistScreen> {
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 100),
               children: [
                 ChecklistMissionBanner(title: widget.missionTitle),
-                if (widget.captureTimestamps && _timeStarted.isNotEmpty) ...[
+                if (widget.captureTimestamps) ...[
                   const SizedBox(height: 8),
                   _TimestampBanner(timeStarted: _timeStarted),
                 ],
                 const SizedBox(height: 12),
-                if (widget.extraSections != null) ...widget.extraSections!(),
+                ...?widget.extraSections?.call(),
                 ..._buildSections(),
               ],
             ),

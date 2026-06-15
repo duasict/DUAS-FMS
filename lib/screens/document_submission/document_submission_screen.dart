@@ -96,27 +96,11 @@ class _DocumentSubmissionScreenState extends State<DocumentSubmissionScreen> {
     final missionId = widget.missionId;
     final now = DateTime.now().toIso8601String();
 
-    await _saveDoc(
-      entry: _travelOrder,
-      docType: 'travel_order',
-      permissionType: '',
-      missionId: missionId,
-      now: now,
-    );
-    await _saveDoc(
-      entry: _sitePermission,
-      docType: 'site_permission',
-      permissionType: _sitePermission.permissionType,
-      missionId: missionId,
-      now: now,
-    );
-    await _saveDoc(
-      entry: _propertyOwner,
-      docType: 'property_owner',
-      permissionType: '',
-      missionId: missionId,
-      now: now,
-    );
+    await Future.wait([
+      _saveDoc(entry: _travelOrder,      docType: 'travel_order',    permissionType: '',                              missionId: missionId, now: now),
+      _saveDoc(entry: _sitePermission,   docType: 'site_permission',  permissionType: _sitePermission.permissionType, missionId: missionId, now: now),
+      _saveDoc(entry: _propertyOwner,    docType: 'property_owner',   permissionType: '',                              missionId: missionId, now: now),
+    ]);
 
     final mission = await db.getMissionById(missionId);
     if (mission != null) {
@@ -423,5 +407,5 @@ class _DocEntry {
 
   _DocEntry({this.existingId, this.filePath, this.permissionType = ''});
 
-  bool get hasFile => filePath != null && filePath!.isNotEmpty;
+  bool get hasFile => filePath != null;
 }
