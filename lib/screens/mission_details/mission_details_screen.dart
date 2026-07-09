@@ -1060,7 +1060,7 @@ class _DocumentsCard extends StatelessWidget {
         ]),
         const SizedBox(height: 10),
         for (final doc in documents) ...[
-          MissionDocumentRow(doc: doc),
+          MissionDocumentRow(doc: doc, allowOpen: true),
           if (doc != documents.last) const SizedBox(height: 6),
         ],
       ]),

@@ -29,6 +29,8 @@ class _DocumentSubmissionScreenState extends State<DocumentSubmissionScreen> {
 
   bool _isLoading = true;
   bool _isSaving = false;
+  List<_AdditionalDocEntry> _additionalDocs = [];
+  final List<int> _deletedAdditionalIds = [];
 
   static const _permissionTypes = [
     'CAAP',
@@ -44,25 +46,40 @@ class _DocumentSubmissionScreenState extends State<DocumentSubmissionScreen> {
     _loadExisting();
   }
 
+  @override
+  void dispose() {
+    for (final d in _additionalDocs) { d.labelCtrl.dispose(); }
+    super.dispose();
+  }
+
   Future<void> _loadExisting() async {
     final docs = await db.getMissionDocuments(widget.missionId);
+    final additionals = <_AdditionalDocEntry>[];
     for (final doc in docs) {
       final type = doc['document_type'] as String;
       final path = doc['file_path'] as String? ?? '';
       final id = doc['id'] as int;
+      final filePath = path.isEmpty ? null : path;
       if (type == 'travel_order') {
-        _travelOrder = _DocEntry(existingId: id, filePath: path.isEmpty ? null : path);
+        _travelOrder = _DocEntry(existingId: id, filePath: filePath);
       } else if (type == 'site_permission') {
         _sitePermission = _DocEntry(
           existingId: id,
-          filePath: path.isEmpty ? null : path,
+          filePath: filePath,
           permissionType: doc['permission_type'] as String? ?? 'CAAP',
         );
       } else if (type == 'property_owner') {
-        _propertyOwner = _DocEntry(existingId: id, filePath: path.isEmpty ? null : path);
+        _propertyOwner = _DocEntry(existingId: id, filePath: filePath);
+      } else {
+        additionals.add(_AdditionalDocEntry(existingId: id, filePath: filePath, label: type));
       }
     }
-    if (mounted) setState(() => _isLoading = false);
+    if (mounted) {
+      setState(() {
+        _additionalDocs = additionals;
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _pick(String docType) async {
@@ -87,6 +104,29 @@ class _DocumentSubmissionScreenState extends State<DocumentSubmissionScreen> {
     });
   }
 
+  void _addAdditionalDoc() {
+    setState(() => _additionalDocs.add(_AdditionalDocEntry()));
+  }
+
+  void _removeAdditionalDoc(int i) {
+    final entry = _additionalDocs[i];
+    if (entry.existingId != null) _deletedAdditionalIds.add(entry.existingId!);
+    entry.labelCtrl.dispose();
+    setState(() => _additionalDocs.removeAt(i));
+  }
+
+  Future<void> _pickAdditional(int i) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf', 'png', 'jpg', 'jpeg'],
+    );
+    if (result == null || result.files.single.path == null) return;
+    setState(() => _additionalDocs[i].filePath = result.files.single.path!);
+  }
+
+  void _clearAdditional(int i) =>
+      setState(() => _additionalDocs[i].filePath = null);
+
   bool get _canSubmit =>
       _travelOrder.hasFile && _sitePermission.hasFile;
 
@@ -101,6 +141,28 @@ class _DocumentSubmissionScreenState extends State<DocumentSubmissionScreen> {
       _saveDoc(entry: _sitePermission,   docType: 'site_permission',  permissionType: _sitePermission.permissionType, missionId: missionId, now: now),
       _saveDoc(entry: _propertyOwner,    docType: 'property_owner',   permissionType: '',                              missionId: missionId, now: now),
     ]);
+
+    // Additional docs: delete all removed + re-save all current
+    final toDelete = [
+      ..._deletedAdditionalIds,
+      ..._additionalDocs.where((d) => d.existingId != null).map((d) => d.existingId!),
+    ];
+    if (toDelete.isNotEmpty) {
+      await Future.wait(toDelete.map((id) => db.deleteMissionDocument(id)));
+    }
+    final withFiles = _additionalDocs.where((d) => d.hasFile).toList();
+    if (withFiles.isNotEmpty) {
+      await Future.wait(withFiles.map((d) => db.insertMissionDocument({
+        'mission_id':     missionId,
+        'document_type':  d.label.trim().isEmpty ? 'Other Document' : d.label.trim(),
+        'permission_type': '',
+        'file_path':      d.filePath!,
+        'file_url':       '',
+        'notes':          '',
+        'created_at':     now,
+        'is_synced':      0,
+      })));
+    }
 
     final mission = await db.getMissionById(missionId);
     if (mission != null) {
@@ -189,6 +251,23 @@ class _DocumentSubmissionScreenState extends State<DocumentSubmissionScreen> {
                   entry: _propertyOwner,
                   docType: 'property_owner',
                 ),
+                const SizedBox(height: 20),
+                Row(children: [
+                  Text('ADDITIONAL DOCUMENTS',
+                      style: TextStyle(
+                          color: context.colors.textMuted,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.2)),
+                  const SizedBox(width: 10),
+                  Expanded(child: Divider(color: context.colors.border)),
+                ]),
+                const SizedBox(height: 10),
+                for (var i = 0; i < _additionalDocs.length; i++) ...[
+                  _additionalDocCard(context, i),
+                  const SizedBox(height: 10),
+                ],
+                _addDocButton(context),
               ],
             ),
       bottomNavigationBar: SafeArea(
@@ -398,6 +477,123 @@ class _DocumentSubmissionScreenState extends State<DocumentSubmissionScreen> {
               color: color, fontSize: 9, fontWeight: FontWeight.w700)),
     );
   }
+
+  Widget _additionalDocCard(BuildContext context, int i) {
+    final entry = _additionalDocs[i];
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: context.colors.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: context.colors.border),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Icon(Icons.insert_drive_file_outlined,
+              size: 18, color: AppColors.primaryLight),
+          const SizedBox(width: 10),
+          Expanded(
+            child: TextField(
+              controller: entry.labelCtrl,
+              style: TextStyle(
+                  color: context.colors.textPrimary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600),
+              decoration: InputDecoration(
+                hintText: 'Document label',
+                hintStyle: TextStyle(
+                    color: context.colors.textMuted,
+                    fontWeight: FontWeight.w400,
+                    fontSize: 14),
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: () => _removeAdditionalDoc(i),
+            child: const Icon(Icons.close, size: 18, color: AppColors.danger),
+          ),
+        ]),
+        const SizedBox(height: 4),
+        Text('Optional supporting or reference document (PDF, PNG, JPG)',
+            style: TextStyle(color: context.colors.textMuted, fontSize: 11)),
+        const SizedBox(height: 12),
+        if (entry.hasFile)
+          _additionalFileRow(context, entry.filePath!, i)
+        else
+          _emptyState(context),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: () => _pickAdditional(i),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            decoration: BoxDecoration(
+              color: context.colors.surface,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: context.colors.border),
+            ),
+            child: Row(children: [
+              Icon(Icons.attach_file_outlined,
+                  size: 16, color: context.colors.textSecondary),
+              const SizedBox(width: 8),
+              Text(entry.hasFile ? 'Replace File' : 'Select File',
+                  style: TextStyle(
+                      color: context.colors.textSecondary, fontSize: 13)),
+            ]),
+          ),
+        ),
+      ]),
+    );
+  }
+
+  Widget _additionalFileRow(BuildContext context, String path, int i) {
+    final name = path.split(Platform.pathSeparator).last;
+    final isPdf = name.toLowerCase().endsWith('.pdf');
+    return Row(children: [
+      Icon(isPdf ? Icons.picture_as_pdf_outlined : Icons.image_outlined,
+          size: 15,
+          color: isPdf ? AppColors.danger : context.colors.textSecondary),
+      const SizedBox(width: 6),
+      Expanded(
+        child: Text(name,
+            style: TextStyle(
+                color: context.colors.textPrimary,
+                fontSize: 12,
+                fontWeight: FontWeight.w500),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis),
+      ),
+      GestureDetector(
+        onTap: () => _clearAdditional(i),
+        child: Icon(Icons.close, size: 16, color: context.colors.textMuted),
+      ),
+    ]);
+  }
+
+  Widget _addDocButton(BuildContext context) {
+    return GestureDetector(
+      onTap: _addAdditionalDoc,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+        ),
+        child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Icon(Icons.add_circle_outline, size: 16, color: AppColors.primary),
+          SizedBox(width: 8),
+          Text('Add Document',
+              style: TextStyle(
+                  color: AppColors.primary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600)),
+        ]),
+      ),
+    );
+  }
 }
 
 class _DocEntry {
@@ -407,5 +603,17 @@ class _DocEntry {
 
   _DocEntry({this.existingId, this.filePath, this.permissionType = ''});
 
+  bool get hasFile => filePath != null;
+}
+
+class _AdditionalDocEntry {
+  int? existingId;
+  String? filePath;
+  final TextEditingController labelCtrl;
+
+  _AdditionalDocEntry({this.existingId, this.filePath, String label = ''})
+      : labelCtrl = TextEditingController(text: label);
+
+  String get label => labelCtrl.text;
   bool get hasFile => filePath != null;
 }
