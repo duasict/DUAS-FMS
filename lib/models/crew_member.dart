@@ -19,8 +19,8 @@ class CrewMember {
     return CrewMember(
       id: map['id'],
       missionId: map['mission_id'],
-      name: map['name'],
-      role: map['role'],
+      name: map['name'] as String? ?? '',
+      role: map['role'] as String? ?? '',
       userId: map['user_id'] as String?,
     );
   }

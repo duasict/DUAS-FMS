@@ -143,7 +143,7 @@ class FlightLog {
 
     return FlightLog(
       id: map['id'],
-      missionId: map['mission_id'],
+      missionId: map['mission_id'] as int? ?? 0,
       dateTime: map['date_time'] ?? '',
       location: map['location'] ?? '',
       latitude: map['latitude'] != null ? (map['latitude'] as num).toDouble() : null,

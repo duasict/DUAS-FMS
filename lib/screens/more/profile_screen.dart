@@ -73,6 +73,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final dest = File('${dir.path}/profile_photo.jpg');
     await File(picked.path).copy(dest.path);
 
+    if (!mounted) return;
     setState(() {
       _photoPath = dest.path;
       _isDirty   = true;

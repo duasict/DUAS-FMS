@@ -114,15 +114,19 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
       if (mounted) setState(() { _isLoading = false; _success = true; });
     } on AuthException catch (e) {
-      setState(() {
-        _error = _friendlyError(e.message);
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _error = _friendlyError(e.message);
+          _isLoading = false;
+        });
+      }
     } catch (_) {
-      setState(() {
-        _error = 'Unable to connect. Check your internet connection.';
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _error = 'Unable to connect. Check your internet connection.';
+          _isLoading = false;
+        });
+      }
     }
   }
 

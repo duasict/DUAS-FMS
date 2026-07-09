@@ -1483,8 +1483,10 @@ class DatabaseHelper {
       _               => 'EQP',
     };
     final rows = await db.rawQuery(
-      "SELECT COUNT(*) AS cnt FROM equipment WHERE type = ?", [type]);
-    final next = ((rows.first['cnt'] as int?) ?? 0) + 1;
+      'SELECT MAX(CAST(SUBSTR(equipment_code, ?) AS INTEGER)) AS mx '
+      'FROM equipment WHERE type = ?',
+      [prefix.length + 2, type]);
+    final next = ((rows.first['mx'] as int?) ?? 0) + 1;
     return '$prefix-${next.toString().padLeft(3, '0')}';
   }
 
@@ -1767,7 +1769,7 @@ class DatabaseHelper {
     final durationResult = await db.rawQuery(
         "SELECT SUM(duration) as total FROM missions WHERE status = 'completed'");
     final totalMin =
-        (durationResult.first['total'] as int?) ?? 0;
+        (durationResult.first['total'] as num?)?.toInt() ?? 0;
     return {
       'missions': (missions.first['c'] as int?) ?? 0,
       'aircraft': (aircraft.first['c'] as int?) ?? 0,
@@ -1796,7 +1798,7 @@ class DatabaseHelper {
         'user_profile',
         profile.toMap(),
         where: 'id = ?',
-        whereArgs: [existing.first['id']],
+        whereArgs: [existing.first['id'] as int],
       );
     }
   }

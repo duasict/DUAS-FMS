@@ -117,7 +117,7 @@ class _EquipmentLockerFormScreenState extends State<EquipmentLockerFormScreen> {
       'purchase_date':  _purchaseDateCtrl.text.trim(),
       'notes':          _notesCtrl.text.trim(),
       'organization_id': orgId,
-      'created_at':     now,
+      if (!_isEdit) 'created_at': now,
       'is_synced':      0,
     };
 

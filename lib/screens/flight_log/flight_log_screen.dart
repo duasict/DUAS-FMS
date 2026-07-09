@@ -49,7 +49,9 @@ class _FlightEntry {
       if (t.length == 2 && l.length == 2) {
         final a = int.parse(t[0]) * 60 + int.parse(t[1]);
         final b = int.parse(l[0]) * 60 + int.parse(l[1]);
-        return (b - a).clamp(0, 9999);
+        var mins = b - a;
+        if (mins < 0) mins += 1440; // handle midnight crossing
+        return mins.clamp(0, 9999);
       }
     } catch (_) {}
     return 0;
@@ -654,10 +656,11 @@ class _FlightLogScreenState extends State<FlightLogScreen> {
             ),
           ]),
           // GPS coordinates captured at confirmation — read-only info
-          if (entry.takeoffLat != null || entry.landingLat != null) ...[
+          if ((entry.takeoffLat != null && entry.takeoffLon != null) ||
+              (entry.landingLat != null && entry.landingLon != null)) ...[
             const SizedBox(height: 6),
             Row(children: [
-              if (entry.takeoffLat != null) ...[
+              if (entry.takeoffLat != null && entry.takeoffLon != null) ...[
                 Icon(Icons.flight_takeoff,
                     size: 11, color: AppColors.success),
                 const SizedBox(width: 3),
@@ -671,9 +674,10 @@ class _FlightLogScreenState extends State<FlightLogScreen> {
                   ),
                 ),
               ],
-              if (entry.takeoffLat != null && entry.landingLat != null)
+              if ((entry.takeoffLat != null && entry.takeoffLon != null) &&
+                  (entry.landingLat != null && entry.landingLon != null))
                 const SizedBox(width: 8),
-              if (entry.landingLat != null) ...[
+              if (entry.landingLat != null && entry.landingLon != null) ...[
                 Icon(Icons.flight_land,
                     size: 11, color: AppColors.primary),
                 const SizedBox(width: 3),

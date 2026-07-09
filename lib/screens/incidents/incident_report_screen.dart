@@ -101,6 +101,7 @@ class _IncidentReportScreenState extends State<IncidentReportScreen> {
 
     final profile = await DatabaseHelper.instance.getUserProfile();
     final orgId = profile?.organizationId ?? '';
+    if (!mounted) return;
     setState(() => _isSaving = true);
     await DatabaseHelper.instance.insertIncidentReport({
       'incident_date': _formatDate(_incidentDate),

@@ -1438,7 +1438,7 @@ class PdfGeneratorService {
           (log['status'] as String? ?? 'good').toLowerCase();
       final statusColor = status == 'good'
           ? _success
-          : status == 'warning'
+          : status == 'degraded'
               ? _warning
               : _danger;
       return pw.Container(

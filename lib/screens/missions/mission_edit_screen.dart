@@ -154,24 +154,32 @@ class _MissionEditScreenState extends State<MissionEditScreen> {
     final navigator = Navigator.of(context);
     final provider  = context.read<AppProvider>();
 
-    // Apply edits to a copy so original is unchanged on failure
-    final updated = widget.mission
-      ..title                  = title
-      ..date                   = _dateStr
-      ..timeStr                = _timeStr
-      ..location               = location
-      ..environment            = _environment
-      ..objective              = objective
-      ..crpAdvisoryNotes       = _crpNotesCtrl.text.trim()
-      ..crpConcurrenceRequired = _crpConcurrenceRequired
-      ..isSynced               = false; // mark dirty for next sync
+    try {
+      widget.mission
+        ..title                  = title
+        ..date                   = _dateStr
+        ..timeStr                = _timeStr
+        ..location               = location
+        ..environment            = _environment
+        ..objective              = objective
+        ..crpAdvisoryNotes       = _crpNotesCtrl.text.trim()
+        ..crpConcurrenceRequired = _crpConcurrenceRequired
+        ..isSynced               = false;
 
-    await DatabaseHelper.instance.updateMission(updated);
-    await provider.refreshMissions();
+      await DatabaseHelper.instance.updateMission(widget.mission);
+      await provider.refreshMissions();
 
-    if (!mounted) return;
-    setState(() => _isSaving = false);
-    navigator.pop(true); // pop with `true` so caller knows to reload
+      if (!mounted) return;
+      navigator.pop(true);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Failed to save changes. Please try again.'),
+        backgroundColor: AppColors.danger,
+      ));
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────

@@ -38,9 +38,16 @@ class MissionDocumentRow extends StatelessWidget {
   String get _subtitle =>
       (_type == 'site_permission' && _permType.isNotEmpty) ? _permType : '';
 
-  Future<void> _open() async {
+  Future<void> _open(BuildContext context) async {
     if (_path.isEmpty) return;
-    await OpenFile.open(_path);
+    final result = await OpenFile.open(_path);
+    if (!context.mounted) return;
+    if (result.type != ResultType.done) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Could not open file — it may have been moved or deleted.'),
+        backgroundColor: Color(0xFFDC2626),
+      ));
+    }
   }
 
   @override
@@ -68,7 +75,7 @@ class MissionDocumentRow extends StatelessWidget {
       if (allowOpen && _path.isNotEmpty) ...[
         const SizedBox(width: 6),
         GestureDetector(
-          onTap: _open,
+          onTap: () => _open(context),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
             decoration: BoxDecoration(

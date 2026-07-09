@@ -106,7 +106,7 @@ class _EquipmentLockerScreenState extends State<EquipmentLockerScreen> {
       context,
       MaterialPageRoute(builder: (_) => EquipmentLockerFormScreen(item: item)),
     );
-    _load();
+    if (mounted) _load();
   }
 }
 

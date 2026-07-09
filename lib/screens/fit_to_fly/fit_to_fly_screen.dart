@@ -112,6 +112,7 @@ class _FitToFlyScreenState extends State<FitToFlyScreen> {
       _rpaModelCtrl.text = mission.aircraftName;
       if (mission.aircraftId != null) {
         final aircraft = await db.getAircraftById(mission.aircraftId!);
+        if (!mounted) return;
         if (aircraft != null) _batteriesNeeded = aircraft.batteriesNeeded;
       }
     }

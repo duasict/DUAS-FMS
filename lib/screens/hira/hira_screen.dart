@@ -134,7 +134,7 @@ class _HiraScreenState extends State<HiraScreen> {
       await provider.updateMission(mission);
       if (_hasHighRisk) {
         await NotificationService.showConcurrenceRequest(
-            widget.missionTitle, mission.title);
+            mission.missionId, mission.title);
       }
     }
 
