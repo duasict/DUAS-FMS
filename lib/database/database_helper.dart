@@ -1388,6 +1388,7 @@ class DatabaseHelper {
     for (final table in [
       'missions', 'flight_logs',
       'maintenance_logs', 'battery_logs', 'incident_reports',
+      'equipment',
     ]) {
       final result = await db
           .rawQuery('SELECT COUNT(*) as c FROM $table WHERE is_synced = 0');
@@ -1544,6 +1545,12 @@ class DatabaseHelper {
     final db = await database;
     return db.query('mission_documents',
         where: 'mission_id = ?', whereArgs: [missionId], orderBy: 'document_type ASC');
+  }
+
+  Future<void> updateMissionDocumentUrl(int id, String url) async {
+    final db = await database;
+    await db.update('mission_documents', {'file_url': url, 'is_synced': 1},
+        where: 'id = ?', whereArgs: [id]);
   }
 
   // ─── Checklist Timestamps ─────────────────────────────────────────────────

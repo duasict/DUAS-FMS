@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Supabase client singleton and helper methods.
@@ -220,4 +222,33 @@ class SupabaseService {
 
   static Future<void> upsertIncidentReports(List<Map<String, dynamic>> rows) =>
       client.from('incident_reports').upsert(rows);
+
+  // ── Equipment ─────────────────────────────────────────────────────────────
+
+  static Future<void> upsertEquipment(List<Map<String, dynamic>> rows) =>
+      client
+          .from('equipment')
+          .upsert(rows, onConflict: 'equipment_code,organization_id');
+
+  // ── Mission Documents ─────────────────────────────────────────────────────
+
+  /// Uploads a document file to the `mission-documents` bucket.
+  /// Returns the storage path on success, null on failure.
+  static Future<String?> uploadMissionDocument(
+      String orgId, String missionRef, String localPath) async {
+    try {
+      final file = File(localPath);
+      if (!await file.exists()) return null;
+      final filename = localPath.split(RegExp(r'[/\\]')).last;
+      final storagePath = '$orgId/$missionRef/$filename';
+      await client.storage
+          .from('mission-documents')
+          .upload(storagePath, file,
+              fileOptions: const FileOptions(upsert: true));
+      return storagePath;
+    } catch (e) {
+      debugPrint('[SupabaseService] doc upload failed for $localPath: $e');
+      return null;
+    }
+  }
 }

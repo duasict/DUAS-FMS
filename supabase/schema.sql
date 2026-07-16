@@ -47,6 +47,9 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   -- License verification (populated via in-app ID card OCR scan — not manual entry)
   license_verified    BOOLEAN NOT NULL DEFAULT FALSE,
   face_verified       BOOLEAN NOT NULL DEFAULT FALSE,
+  -- 'organizational' = org member | 'personal' = solo user (no org cloud sync)
+  account_type        TEXT NOT NULL DEFAULT 'organizational'
+                        CHECK (account_type IN ('organizational', 'personal')),
   organization_id     UUID REFERENCES public.organizations(id),
   created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -126,6 +129,9 @@ CREATE TABLE IF NOT EXISTS public.missions (
   has_inflight_complete     BOOLEAN NOT NULL DEFAULT FALSE,
   has_postflight_complete   BOOLEAN NOT NULL DEFAULT FALSE,
   has_flightlog_complete    BOOLEAN NOT NULL DEFAULT FALSE,
+  has_documents_complete    BOOLEAN NOT NULL DEFAULT FALSE,
+  takeoff_time              TEXT NOT NULL DEFAULT '',
+  landing_time              TEXT NOT NULL DEFAULT '',
   created_at                TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at                TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (mission_ref, organization_id)
@@ -184,6 +190,7 @@ CREATE TABLE IF NOT EXISTS public.flight_plans (
   airspace_restrictions TEXT,
   mission_objectives    TEXT,
   contingency_plan      TEXT,
+  coverage_area_geojson TEXT,                -- GeoJSON polygon string from map drawing
   organization_id       UUID REFERENCES public.organizations(id),
   created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -272,6 +279,8 @@ CREATE TABLE IF NOT EXISTS public.flight_logs (
   data_photos        TEXT,
   data_video         TEXT,
   data_lidar         BOOLEAN DEFAULT FALSE,
+  -- Photos uploaded to uas-photos bucket (storage paths, JSON array)
+  photo_paths        TEXT DEFAULT '',
   -- Maintenance
   next_maintenance   TEXT,       -- free text e.g. '50 hrs / 2025-06-01'
   organization_id    UUID REFERENCES public.organizations(id),
@@ -332,7 +341,7 @@ CREATE TABLE IF NOT EXISTS public.battery_logs (
   voltage_after   FLOAT8,
   charge_time_min INT4,
   status          TEXT NOT NULL DEFAULT 'good'
-                    CHECK (status IN ('good', 'degraded', 'replace')),
+                    CHECK (status IN ('good', 'degraded', 'retired')),
   remarks         TEXT NOT NULL DEFAULT '',
   organization_id UUID REFERENCES public.organizations(id),
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -397,6 +406,28 @@ CREATE TABLE IF NOT EXISTS public.alerts (
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- ─── Equipment Locker ─────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.equipment (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  equipment_code   TEXT NOT NULL DEFAULT '',
+  name             TEXT NOT NULL DEFAULT '',
+  type             TEXT NOT NULL DEFAULT 'other',
+  serial_number    TEXT NOT NULL DEFAULT '',
+  model            TEXT NOT NULL DEFAULT '',
+  manufacturer     TEXT NOT NULL DEFAULT '',
+  description      TEXT NOT NULL DEFAULT '',
+  battery_type     TEXT NOT NULL DEFAULT '',
+  capacity_mah     INTEGER DEFAULT 0,
+  condition        TEXT NOT NULL DEFAULT 'serviceable',
+  quantity         INTEGER DEFAULT 1,
+  storage_location TEXT NOT NULL DEFAULT '',
+  purchase_date    TEXT NOT NULL DEFAULT '',
+  notes            TEXT NOT NULL DEFAULT '',
+  organization_id  UUID REFERENCES public.organizations(id),
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT equipment_code_org_unique UNIQUE (equipment_code, organization_id)
+);
+
 -- ════════════════════════════════════════════════════════════════════════════
 -- INDEXES
 -- ════════════════════════════════════════════════════════════════════════════
@@ -437,6 +468,7 @@ ALTER TABLE public.incident_reports   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.p2p_sessions       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.alerts             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.mission_flights    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.equipment          ENABLE ROW LEVEL SECURITY;
 
 -- Helper: resolve the caller's organization_id from profiles
 CREATE OR REPLACE FUNCTION public.my_org_id()
@@ -474,7 +506,7 @@ BEGIN
     'aircraft', 'missions', 'mission_crew', 'concurrences', 'flight_plans',
     'hira_rows', 'checklist_items', 'fit_to_fly_records', 'flight_logs',
     'maintenance_logs', 'battery_logs', 'incident_reports',
-    'p2p_sessions', 'alerts', 'mission_flights'
+    'p2p_sessions', 'alerts', 'mission_flights', 'equipment'
   ] LOOP
     EXECUTE format(
       'DROP POLICY IF EXISTS %I ON public.%I',

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../database/database_helper.dart';
 import '../../providers/app_provider.dart';
+import '../../services/supabase_service.dart';
 import '../../theme/app_theme.dart';
 
 class DocumentSubmissionScreen extends StatefulWidget {
@@ -136,41 +137,58 @@ class _DocumentSubmissionScreenState extends State<DocumentSubmissionScreen> {
     final missionId = widget.missionId;
     final now = DateTime.now().toIso8601String();
 
-    await Future.wait([
-      _saveDoc(entry: _travelOrder,      docType: 'travel_order',    permissionType: '',                              missionId: missionId, now: now),
-      _saveDoc(entry: _sitePermission,   docType: 'site_permission',  permissionType: _sitePermission.permissionType, missionId: missionId, now: now),
-      _saveDoc(entry: _propertyOwner,    docType: 'property_owner',   permissionType: '',                              missionId: missionId, now: now),
-    ]);
-
-    // Additional docs: delete all removed + re-save all current
-    final toDelete = [
-      ..._deletedAdditionalIds,
-      ..._additionalDocs.where((d) => d.existingId != null).map((d) => d.existingId!),
-    ];
-    if (toDelete.isNotEmpty) {
-      await Future.wait(toDelete.map((id) => db.deleteMissionDocument(id)));
-    }
-    final withFiles = _additionalDocs.where((d) => d.hasFile).toList();
-    if (withFiles.isNotEmpty) {
-      await Future.wait(withFiles.map((d) => db.insertMissionDocument({
-        'mission_id':     missionId,
-        'document_type':  d.label.trim().isEmpty ? 'Other Document' : d.label.trim(),
-        'permission_type': '',
-        'file_path':      d.filePath!,
-        'file_url':       '',
-        'notes':          '',
-        'created_at':     now,
-        'is_synced':      0,
-      })));
-    }
-
     final mission = await db.getMissionById(missionId);
-    if (mission != null) {
-      mission.hasDocumentsComplete = true;
-      if (mounted) await context.read<AppProvider>().updateMission(mission);
-    }
+    final profile = await db.getUserProfile();
+    final missionRef = mission?.missionId ?? '';
+    final orgId = profile?.organizationId ?? '';
 
-    if (mounted) Navigator.pop(context);
+    try {
+      await Future.wait([
+        _saveDoc(entry: _travelOrder,    docType: 'travel_order',    permissionType: '',                              missionId: missionId, now: now, missionRef: missionRef, orgId: orgId),
+        _saveDoc(entry: _sitePermission, docType: 'site_permission', permissionType: _sitePermission.permissionType, missionId: missionId, now: now, missionRef: missionRef, orgId: orgId),
+        _saveDoc(entry: _propertyOwner,  docType: 'property_owner',  permissionType: '',                              missionId: missionId, now: now, missionRef: missionRef, orgId: orgId),
+      ]);
+
+      // Additional docs: delete all removed + re-save all current
+      final toDelete = [
+        ..._deletedAdditionalIds,
+        ..._additionalDocs.where((d) => d.existingId != null).map((d) => d.existingId!),
+      ];
+      if (toDelete.isNotEmpty) {
+        await Future.wait(toDelete.map((id) => db.deleteMissionDocument(id)));
+      }
+      final withFiles = _additionalDocs.where((d) => d.hasFile).toList();
+      if (withFiles.isNotEmpty) {
+        final ids = await Future.wait(withFiles.map((d) => db.insertMissionDocument({
+          'mission_id':      missionId,
+          'document_type':   d.label.trim().isEmpty ? 'Other Document' : d.label.trim(),
+          'permission_type': '',
+          'file_path':       d.filePath!,
+          'file_url':        '',
+          'notes':           '',
+          'created_at':      now,
+          'is_synced':       0,
+        })));
+        if (SupabaseService.isSignedIn && orgId.isNotEmpty) {
+          await Future.wait(List.generate(withFiles.length, (i) async {
+            final storagePath = await SupabaseService.uploadMissionDocument(
+                orgId, missionRef, withFiles[i].filePath!);
+            if (storagePath != null) {
+              await db.updateMissionDocumentUrl(ids[i], storagePath);
+            }
+          }));
+        }
+      }
+
+      if (mission != null) {
+        mission.hasDocumentsComplete = true;
+        if (mounted) await context.read<AppProvider>().updateMission(mission);
+      }
+
+      if (mounted) Navigator.pop(context);
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   Future<void> _saveDoc({
@@ -179,21 +197,30 @@ class _DocumentSubmissionScreenState extends State<DocumentSubmissionScreen> {
     required String permissionType,
     required int missionId,
     required String now,
+    required String missionRef,
+    required String orgId,
   }) async {
     if (entry.existingId != null) {
       await db.deleteMissionDocument(entry.existingId!);
     }
     if (entry.hasFile) {
-      await db.insertMissionDocument({
-        'mission_id': missionId,
-        'document_type': docType,
+      final id = await db.insertMissionDocument({
+        'mission_id':      missionId,
+        'document_type':   docType,
         'permission_type': permissionType,
-        'file_path': entry.filePath!,
-        'file_url': '',
-        'notes': '',
-        'created_at': now,
-        'is_synced': 0,
+        'file_path':       entry.filePath!,
+        'file_url':        '',
+        'notes':           '',
+        'created_at':      now,
+        'is_synced':       0,
       });
+      if (SupabaseService.isSignedIn && orgId.isNotEmpty) {
+        final storagePath = await SupabaseService.uploadMissionDocument(
+            orgId, missionRef, entry.filePath!);
+        if (storagePath != null) {
+          await db.updateMissionDocumentUrl(id, storagePath);
+        }
+      }
     }
   }
 

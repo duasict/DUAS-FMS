@@ -108,6 +108,24 @@ class SyncService {
         debugPrint('[SyncService] battery_logs sync error: $e\n$st');
       }
 
+      bool equipSynced = false;
+      try {
+        final rows = await dbRaw
+            .rawQuery('SELECT * FROM equipment WHERE is_synced = 0');
+        if (rows.isNotEmpty) {
+          final cleaned = rows.map((r) {
+            final m = Map<String, dynamic>.from(r);
+            m.remove('id');
+            m.remove('is_synced');
+            return m;
+          }).toList();
+          await SupabaseService.upsertEquipment(cleaned);
+        }
+        equipSynced = true;
+      } catch (e, st) {
+        debugPrint('[SyncService] equipment sync error: $e\n$st');
+      }
+
       try {
         final rows = await dbRaw
             .rawQuery('SELECT * FROM incident_reports WHERE is_synced = 0');
@@ -138,6 +156,9 @@ class SyncService {
       if (battSynced) {
         batch.update('battery_logs', {'is_synced': 1},
             where: 'is_synced = 0');
+      }
+      if (equipSynced) {
+        batch.update('equipment', {'is_synced': 1}, where: 'is_synced = 0');
       }
       if (incSyncedIds.isNotEmpty) {
         final ph = List.filled(incSyncedIds.length, '?').join(',');
@@ -175,7 +196,7 @@ class SyncService {
     m.remove('is_synced');
     // Clear local integer FKs — they are not valid Supabase UUIDs
     for (final k in ['aircraft_id', 'mission_id', 'reporter_id',
-                     'technician_id']) {
+                     'technician_id', 'equipment_id']) {
       if (m.containsKey(k)) m[k] = null;
     }
     m['organization_id'] = orgId;
