@@ -94,7 +94,9 @@ DUAS FMS Mobile provides a complete end-to-end mission management workflow for R
 
 ### Authentication & Cloud Sync
 - Supabase email/password authentication
-- Offline-first: encrypted SQLite is the primary local store; cloud sync is deferred (planned)
+- Offline-first: encrypted SQLite is the primary local store; cloud sync pushes when online
+- Synced tables: missions (with crew, HIRA, checklists, flight plan, fit-to-fly record, flight log, flight legs), aircraft, equipment, mission equipment assignments, fit-to-fly battery selections, maintenance logs, battery logs, incident reports, mission documents
+- Unsynced-record badge in the nav bar reflects all pending tables
 - Password reset via email
 
 ---
@@ -123,7 +125,7 @@ DUAS FMS Mobile provides a complete end-to-end mission management workflow for R
 
 ```
 lib/
-├── database/               # DatabaseHelper — encrypted SQLite, schema v16
+├── database/               # DatabaseHelper — encrypted SQLite, schema v17
 ├── models/                 # Mission, Aircraft, EquipmentItem, UserProfile, HiraRow, etc.
 ├── providers/              # ChangeNotifier providers (App, Theme, UserProfile, OrgSettings)
 ├── screens/
@@ -152,7 +154,8 @@ lib/
 ├── services/
 │   ├── org_settings_service.dart  # Org branding persistence
 │   ├── pdf_generator_service.dart # Annex A/D PDF generation
-│   └── supabase_service.dart      # Auth + Supabase client
+│   ├── supabase_service.dart      # Auth, Supabase client, upsert/replace helpers
+│   └── sync_service.dart          # Cloud sync orchestration (connectivity, ordering, retry)
 ├── theme/                  # AppTheme, AppColors, dark/light colour schemes
 ├── utils/
 │   ├── app_constants.dart  # White-label config defaults
@@ -173,7 +176,7 @@ supabase/
 
 ### Prerequisites
 - Flutter SDK ≥ 3.10.8
-- Android SDK (minSdk 21) or Xcode for iOS builds
+- Android SDK (minSdk 24 / Android 7.0) or Xcode for iOS builds
 - A Supabase project (or use the existing DUAS project credentials)
 
 ### Setup
@@ -226,10 +229,10 @@ Default fallback values live in `lib/utils/app_constants.dart` and `lib/services
 
 The app uses a **dual-database** architecture:
 
-- **SQLite** (local, encrypted) — primary store, always available offline. Schema version **16**.
-- **Supabase / PostgreSQL** (cloud) — sync target with full RLS multi-tenancy (sync planned).
+- **SQLite** (local, encrypted) — primary store, always available offline. Schema version **17**.
+- **Supabase / PostgreSQL** (cloud) — sync target with full RLS multi-tenancy. Sync runs automatically when online.
 
-Key local tables: `missions`, `mission_crew`, `mission_flights`, `mission_documents`, `hira_rows`, `checklist_items`, `checklist_timestamps`, `flight_plans`, `fit_to_fly_records`, `fit_to_fly_batteries`, `flight_logs`, `maintenance_logs`, `battery_logs`, `incident_reports`, `equipment_items`, `mission_equipment`, `aircraft`, `profiles`, `alerts`.
+Key local tables: `missions`, `mission_crew`, `mission_flights`, `mission_documents`, `hira_rows`, `checklist_items`, `checklist_timestamps`, `flight_plans`, `fit_to_fly_records`, `fit_to_fly_batteries`, `flight_logs`, `maintenance_logs`, `battery_logs`, `incident_reports`, `equipment`, `mission_equipment`, `aircraft`, `profiles`, `alerts`.
 
 All cloud tables are isolated by `organization_id` via the `my_org_id()` RLS helper function.
 
@@ -247,4 +250,4 @@ Annex forms covered: A-1 (Flight Plan), A-2 (HIRA), A-3 (Equipment), A-4 (Fit-to
 
 ## Version
 
-`v1.1.0` — Equipment Locker, Document Submission, Personal Accounts, encrypted local DB, PDF report log with ZIP export
+`v1.2.0` — Cloud sync live: aircraft, equipment, mission equipment assignments, fit-to-fly battery selections, mission documents retry; sync badge counts all pending tables; Android minSdk raised to 24
