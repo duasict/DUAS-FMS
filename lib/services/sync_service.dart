@@ -54,8 +54,84 @@ class SyncService {
       final orgId = profile.organizationId;
       final userId = profile.supabaseId;
 
-      final unsyncedMissions =
-          await DatabaseHelper.instance.getUnsyncedMissions();
+      final db = DatabaseHelper.instance;
+      final dbRaw = await db.database;
+
+      // Aircraft — must sync before missions so supabase_ids are ready for
+      // junction table lookups. Aircraft without a serial_number are skipped
+      // (they cannot be uniquely upserted on the Supabase partial unique index).
+      try {
+        final unsyncedAircraft = await db.getUnsyncedAircraft();
+        if (unsyncedAircraft.isNotEmpty) {
+          final snToLocalId = <String, int>{};
+          final payload = <Map<String, dynamic>>[];
+          for (final r in unsyncedAircraft) {
+            final localId = r['id'] as int;
+            final sn = r['serial_number'] as String? ?? '';
+            snToLocalId[sn] = localId;
+            final m = Map<String, dynamic>.from(r);
+            m.remove('id');
+            m.remove('is_synced');
+            m.remove('supabase_id');
+            // Supabase column is photo_url (nullable); local column is photo_path
+            m.remove('photo_path');
+            m['organization_id'] = orgId;
+            // Empty created_at would be rejected by Supabase TIMESTAMPTZ; let
+            // the column default (NOW()) apply instead.
+            final ca = m['created_at'] as String? ?? '';
+            if (ca.isEmpty) m.remove('created_at');
+            payload.add(m);
+          }
+          final returned = await SupabaseService.upsertAircraft(payload);
+          for (final row in returned) {
+            final sn = row['serial_number'] as String? ?? '';
+            final supabaseId = row['id'] as String?;
+            final localId = snToLocalId[sn];
+            if (supabaseId != null && localId != null) {
+              await db.updateAircraftSupabaseId(localId, supabaseId);
+            }
+          }
+        }
+      } catch (e, st) {
+        debugPrint('[SyncService] aircraft sync error: $e\n$st');
+      }
+
+      // Equipment — must sync before missions so supabase_ids are ready for
+      // mission_equipment and fit_to_fly_batteries junction tables.
+      try {
+        final unsyncedEquipment = await db.getUnsyncedEquipment();
+        if (unsyncedEquipment.isNotEmpty) {
+          final codeToLocalId = <String, int>{};
+          final payload = <Map<String, dynamic>>[];
+          for (final r in unsyncedEquipment) {
+            final localId = r['id'] as int;
+            final code = r['equipment_code'] as String? ?? '';
+            codeToLocalId[code] = localId;
+            final m = Map<String, dynamic>.from(r);
+            m.remove('id');
+            m.remove('is_synced');
+            m.remove('supabase_id');
+            m['organization_id'] = orgId;
+            final ca = m['created_at'] as String? ?? '';
+            if (ca.isEmpty) m.remove('created_at');
+            payload.add(m);
+          }
+          final returned = await SupabaseService.upsertEquipment(payload);
+          for (final row in returned) {
+            final code = row['equipment_code'] as String? ?? '';
+            final supabaseId = row['id'] as String?;
+            final localId = codeToLocalId[code];
+            if (supabaseId != null && localId != null) {
+              await db.updateEquipmentSupabaseId(localId, supabaseId);
+            }
+          }
+        }
+      } catch (e, st) {
+        debugPrint('[SyncService] equipment sync error: $e\n$st');
+      }
+
+      // Missions — runs after aircraft/equipment so junction tables have UUIDs.
+      final unsyncedMissions = await DatabaseHelper.instance.getUnsyncedMissions();
 
       int synced = 0;
       for (final mission in unsyncedMissions) {
@@ -68,12 +144,10 @@ class SyncService {
         }
       }
 
-      // Sync standalone logs (not tied to a mission UUID).
+      // Standalone logs (not tied to a mission UUID).
       // Each table is wrapped in its own try/catch so a failure in one table
-      // does not abort the others, and only successfully-uploaded tables are
-      // marked as synced locally.
-      final db = DatabaseHelper.instance;
-      final dbRaw = await db.database;
+      // does not abort the others, and only successfully-uploaded rows are
+      // marked synced locally.
       var maintSyncedIds = <int>[], incSyncedIds = <int>[];
       bool battSynced = false;
 
@@ -106,71 +180,6 @@ class SyncService {
         battSynced = true;
       } catch (e, st) {
         debugPrint('[SyncService] battery_logs sync error: $e\n$st');
-      }
-
-      // Aircraft — sync before missions so supabase_ids are available for
-      // junction table lookups. Aircraft without a serial_number are skipped
-      // (they cannot be uniquely upserted on the Supabase unique index).
-      try {
-        final unsyncedAircraft = await db.getUnsyncedAircraft();
-        if (unsyncedAircraft.isNotEmpty) {
-          final snToLocalId = <String, int>{};
-          final payload = <Map<String, dynamic>>[];
-          for (final r in unsyncedAircraft) {
-            final localId = r['id'] as int;
-            final sn = r['serial_number'] as String? ?? '';
-            snToLocalId[sn] = localId;
-            final m = Map<String, dynamic>.from(r);
-            m.remove('id');
-            m.remove('is_synced');
-            m.remove('supabase_id');
-            m['organization_id'] = orgId;
-            payload.add(m);
-          }
-          final returned = await SupabaseService.upsertAircraft(payload);
-          for (final row in returned) {
-            final sn = row['serial_number'] as String? ?? '';
-            final supabaseId = row['id'] as String?;
-            final localId = snToLocalId[sn];
-            if (supabaseId != null && localId != null) {
-              await db.updateAircraftSupabaseId(localId, supabaseId);
-            }
-          }
-        }
-      } catch (e, st) {
-        debugPrint('[SyncService] aircraft sync error: $e\n$st');
-      }
-
-      // Equipment — sync before missions so supabase_ids are available for
-      // mission_equipment and fit_to_fly_batteries junction tables.
-      try {
-        final unsyncedEquipment = await db.getUnsyncedEquipment();
-        if (unsyncedEquipment.isNotEmpty) {
-          final codeToLocalId = <String, int>{};
-          final payload = <Map<String, dynamic>>[];
-          for (final r in unsyncedEquipment) {
-            final localId = r['id'] as int;
-            final code = r['equipment_code'] as String? ?? '';
-            codeToLocalId[code] = localId;
-            final m = Map<String, dynamic>.from(r);
-            m.remove('id');
-            m.remove('is_synced');
-            m.remove('supabase_id');
-            m['organization_id'] = orgId;
-            payload.add(m);
-          }
-          final returned = await SupabaseService.upsertEquipment(payload);
-          for (final row in returned) {
-            final code = row['equipment_code'] as String? ?? '';
-            final supabaseId = row['id'] as String?;
-            final localId = codeToLocalId[code];
-            if (supabaseId != null && localId != null) {
-              await db.updateEquipmentSupabaseId(localId, supabaseId);
-            }
-          }
-        }
-      } catch (e, st) {
-        debugPrint('[SyncService] equipment sync error: $e\n$st');
       }
 
       try {
