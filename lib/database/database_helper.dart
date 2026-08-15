@@ -16,7 +16,7 @@ import '../services/org_settings_service.dart';
 
 class DatabaseHelper {
   static const _dbName = 'uas_fms.db';
-  static const _dbVersion = 16;
+  static const _dbVersion = 17;
 
   DatabaseHelper._();
   static final DatabaseHelper instance = DatabaseHelper._();
@@ -367,6 +367,20 @@ class DatabaseHelper {
         )
       ''');
     }
+    if (oldVersion < 17) {
+      // aircraft: add sync tracking + org binding + Supabase UUID cache
+      await db.execute(
+          "ALTER TABLE aircraft ADD COLUMN organization_id TEXT NOT NULL DEFAULT ''");
+      await db.execute(
+          'ALTER TABLE aircraft ADD COLUMN is_synced INTEGER DEFAULT 0');
+      await db.execute(
+          "ALTER TABLE aircraft ADD COLUMN created_at TEXT NOT NULL DEFAULT ''");
+      await db.execute(
+          'ALTER TABLE aircraft ADD COLUMN supabase_id TEXT DEFAULT NULL');
+      // equipment: cache the Supabase UUID so junction tables can reference it
+      await db.execute(
+          'ALTER TABLE equipment ADD COLUMN supabase_id TEXT DEFAULT NULL');
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -428,7 +442,11 @@ class DatabaseHelper {
         mtow REAL NOT NULL,
         status TEXT NOT NULL,
         photo_path TEXT DEFAULT '',
-        batteries_needed INTEGER DEFAULT 1
+        batteries_needed INTEGER DEFAULT 1,
+        organization_id TEXT NOT NULL DEFAULT '',
+        is_synced INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT '',
+        supabase_id TEXT DEFAULT NULL
       )
     ''');
 
@@ -666,7 +684,8 @@ class DatabaseHelper {
         notes TEXT NOT NULL DEFAULT '',
         organization_id TEXT NOT NULL DEFAULT '',
         created_at TEXT NOT NULL,
-        is_synced INTEGER DEFAULT 0
+        is_synced INTEGER DEFAULT 0,
+        supabase_id TEXT DEFAULT NULL
       )
     ''');
 
@@ -1124,18 +1143,40 @@ class DatabaseHelper {
 
   Future<int> insertAircraft(Aircraft a) async {
     final db = await database;
-    return db.insert('aircraft', a.toMap());
+    final map = a.toMap();
+    if ((map['organization_id'] as String? ?? '').isEmpty) {
+      final profile = await getUserProfile();
+      map['organization_id'] = profile?.organizationId ?? '';
+    }
+    if ((map['created_at'] as String? ?? '').isEmpty) {
+      map['created_at'] = DateTime.now().toIso8601String();
+    }
+    map['is_synced'] = 0;
+    return db.insert('aircraft', map);
   }
 
   Future<void> updateAircraft(Aircraft a) async {
     final db = await database;
-    await db.update('aircraft', a.toMap(),
-        where: 'id = ?', whereArgs: [a.id]);
+    final map = a.toMap();
+    map['is_synced'] = 0;
+    await db.update('aircraft', map, where: 'id = ?', whereArgs: [a.id]);
   }
 
   Future<void> deleteAircraft(int id) async {
     final db = await database;
     await db.delete('aircraft', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> updateAircraftSupabaseId(int localId, String supabaseId) async {
+    final db = await database;
+    await db.update('aircraft',
+        {'supabase_id': supabaseId, 'is_synced': 1},
+        where: 'id = ?', whereArgs: [localId]);
+  }
+
+  Future<List<Map<String, dynamic>>> getUnsyncedAircraft() async {
+    final db = await database;
+    return db.query('aircraft', where: 'is_synced = 0 AND serial_number != \'\'');
   }
 
   // ─── Alerts ───────────────────────────────────────────────────────────────
@@ -1388,7 +1429,7 @@ class DatabaseHelper {
     for (final table in [
       'missions', 'flight_logs',
       'maintenance_logs', 'battery_logs', 'incident_reports',
-      'equipment',
+      'equipment', 'aircraft', 'mission_documents',
     ]) {
       final result = await db
           .rawQuery('SELECT COUNT(*) as c FROM $table WHERE is_synced = 0');
@@ -1461,6 +1502,27 @@ class DatabaseHelper {
   Future<void> deleteEquipment(int id) async {
     final db = await database;
     await db.delete('equipment', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> updateEquipmentSupabaseId(int localId, String supabaseId) async {
+    final db = await database;
+    await db.update('equipment',
+        {'supabase_id': supabaseId, 'is_synced': 1},
+        where: 'id = ?', whereArgs: [localId]);
+  }
+
+  Future<String?> getEquipmentSupabaseId(int localEquipmentId) async {
+    final db = await database;
+    final rows = await db.query('equipment',
+        columns: ['supabase_id'],
+        where: 'id = ?', whereArgs: [localEquipmentId]);
+    if (rows.isEmpty) return null;
+    return rows.first['supabase_id'] as String?;
+  }
+
+  Future<List<Map<String, dynamic>>> getUnsyncedEquipment() async {
+    final db = await database;
+    return db.query('equipment', where: 'is_synced = 0');
   }
 
   Future<List<Map<String, dynamic>>> getEquipment() async {
@@ -1551,6 +1613,28 @@ class DatabaseHelper {
     final db = await database;
     await db.update('mission_documents', {'file_url': url, 'is_synced': 1},
         where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<List<Map<String, dynamic>>> getUnsyncedMissionDocuments() async {
+    final db = await database;
+    return db.query('mission_documents', where: 'is_synced = 0');
+  }
+
+  Future<String?> getMissionRef(int localId) async {
+    final db = await database;
+    final rows = await db.query('missions',
+        columns: ['mission_id'], where: 'id = ?', whereArgs: [localId]);
+    if (rows.isEmpty) return null;
+    return rows.first['mission_id'] as String?;
+  }
+
+  // Returns the raw mission_equipment rows for a given local mission id.
+  // Uses a plain query (no JOIN) so rows with null equipment_id are included.
+  Future<List<Map<String, dynamic>>> getMissionEquipmentIds(int missionId) async {
+    final db = await database;
+    return db.query('mission_equipment',
+        columns: ['id', 'equipment_id', 'purpose', 'notes'],
+        where: 'mission_id = ?', whereArgs: [missionId]);
   }
 
   // ─── Checklist Timestamps ─────────────────────────────────────────────────

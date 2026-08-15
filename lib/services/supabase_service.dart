@@ -225,10 +225,56 @@ class SupabaseService {
 
   // ── Equipment ─────────────────────────────────────────────────────────────
 
-  static Future<void> upsertEquipment(List<Map<String, dynamic>> rows) =>
-      client
-          .from('equipment')
-          .upsert(rows, onConflict: 'equipment_code,organization_id');
+  /// Upserts equipment rows and returns [{id, equipment_code}] for each row
+  /// so the caller can store the Supabase UUID locally.
+  static Future<List<Map<String, dynamic>>> upsertEquipment(
+      List<Map<String, dynamic>> rows) async {
+    final result = await client
+        .from('equipment')
+        .upsert(rows, onConflict: 'equipment_code,organization_id')
+        .select('id,equipment_code');
+    return List<Map<String, dynamic>>.from(result as List);
+  }
+
+  // ── Aircraft ──────────────────────────────────────────────────────────────
+
+  /// Upserts aircraft rows and returns [{id, serial_number}] for each row.
+  static Future<List<Map<String, dynamic>>> upsertAircraft(
+      List<Map<String, dynamic>> rows) async {
+    final result = await client
+        .from('aircraft')
+        .upsert(rows, onConflict: 'serial_number,organization_id')
+        .select('id,serial_number');
+    return List<Map<String, dynamic>>.from(result as List);
+  }
+
+  // ── Mission Equipment ─────────────────────────────────────────────────────
+
+  /// Replaces all equipment assignments for a mission (delete + insert).
+  static Future<void> replaceMissionEquipment(
+      String missionUuid, List<Map<String, dynamic>> rows) async {
+    await client
+        .from('mission_equipment')
+        .delete()
+        .eq('mission_id', missionUuid);
+    if (rows.isNotEmpty) {
+      await client.from('mission_equipment').insert(rows);
+    }
+  }
+
+  // ── Fit-to-Fly Battery Selections ─────────────────────────────────────────
+
+  /// Replaces all fit-to-fly battery slots for a mission (delete + insert).
+  static Future<void> replaceFitToFlyBatteries(
+      String missionUuid, List<Map<String, dynamic>> rows) async {
+    await client
+        .from('fit_to_fly_batteries')
+        .delete()
+        .eq('mission_id', missionUuid);
+    if (rows.isNotEmpty) {
+      await client.from('fit_to_fly_batteries').insert(rows);
+    }
+  }
 
   // ── Mission Documents ─────────────────────────────────────────────────────
 

@@ -77,17 +77,19 @@ CREATE TRIGGER on_auth_user_created
 
 -- ─── Aircraft ─────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.aircraft (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name            TEXT NOT NULL,
-  type            TEXT NOT NULL
-                    CHECK (type IN ('multi-rotor', 'vtol', 'fixed-wing')),
-  model           TEXT NOT NULL,
-  serial_number   TEXT NOT NULL DEFAULT '',
-  mtow            FLOAT8 NOT NULL DEFAULT 0,
-  status          TEXT NOT NULL DEFAULT 'serviceable'
-                    CHECK (status IN ('serviceable', 'under_maintenance', 'unserviceable')),
-  organization_id UUID REFERENCES public.organizations(id),
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name             TEXT NOT NULL,
+  type             TEXT NOT NULL
+                     CHECK (type IN ('multi-rotor', 'vtol', 'fixed-wing')),
+  model            TEXT NOT NULL,
+  serial_number    TEXT NOT NULL DEFAULT '',
+  mtow             FLOAT8 NOT NULL DEFAULT 0,
+  status           TEXT NOT NULL DEFAULT 'serviceable'
+                     CHECK (status IN ('serviceable', 'under_maintenance', 'unserviceable')),
+  photo_url        TEXT,
+  batteries_needed INTEGER NOT NULL DEFAULT 1,
+  organization_id  UUID REFERENCES public.organizations(id),
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- ════════════════════════════════════════════════════════════════════════════
@@ -325,6 +327,7 @@ CREATE TABLE IF NOT EXISTS public.maintenance_logs (
                              CHECK (airworthiness_status IN ('serviceable', 'unserviceable')),
   signed_by                TEXT NOT NULL DEFAULT '',
   remarks                  TEXT NOT NULL DEFAULT '',
+  photo_paths              TEXT NOT NULL DEFAULT '',
   organization_id          UUID REFERENCES public.organizations(id),
   created_at               TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -334,9 +337,12 @@ CREATE TABLE IF NOT EXISTS public.battery_logs (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   aircraft_id     UUID REFERENCES public.aircraft(id),
   mission_id      UUID REFERENCES public.missions(id),
-  battery_id      TEXT NOT NULL,          -- serial number or label
+  equipment_id    UUID REFERENCES public.equipment(id),
+  battery_id      TEXT NOT NULL,
+  battery_type    TEXT NOT NULL DEFAULT '',
   log_date        DATE NOT NULL,
   charge_cycles   INT4,
+  cell_voltages   TEXT NOT NULL DEFAULT '',
   voltage_before  FLOAT8,
   voltage_after   FLOAT8,
   charge_time_min INT4,
@@ -366,6 +372,7 @@ CREATE TABLE IF NOT EXISTS public.incident_reports (
   corrective_actions  TEXT NOT NULL DEFAULT '',
   reported_to_caap    BOOLEAN NOT NULL DEFAULT FALSE,
   caap_reference      TEXT,
+  photo_paths         TEXT NOT NULL DEFAULT '',
   organization_id     UUID REFERENCES public.organizations(id),
   created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -542,3 +549,79 @@ DROP TRIGGER IF EXISTS trg_profiles_updated_at ON public.profiles;
 CREATE TRIGGER trg_profiles_updated_at
   BEFORE UPDATE ON public.profiles
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- JUNCTION TABLES (mission ↔ equipment)
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- ─── Mission Equipment ────────────────────────────────────────────────────────
+-- Equipment items assigned to a specific mission (from Equipment Checklist)
+CREATE TABLE IF NOT EXISTS public.mission_equipment (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  mission_id      UUID NOT NULL REFERENCES public.missions(id) ON DELETE CASCADE,
+  -- Nullable: equipment may not be synced yet when the mission first syncs
+  equipment_id    UUID REFERENCES public.equipment(id) ON DELETE SET NULL,
+  purpose         TEXT NOT NULL DEFAULT '',
+  notes           TEXT NOT NULL DEFAULT '',
+  organization_id UUID REFERENCES public.organizations(id),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ─── Fit-to-Fly Battery Selections ───────────────────────────────────────────
+-- Battery slots filled during the Fit-to-Fly checklist per mission
+CREATE TABLE IF NOT EXISTS public.fit_to_fly_batteries (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  mission_id      UUID NOT NULL REFERENCES public.missions(id) ON DELETE CASCADE,
+  slot_index      INTEGER NOT NULL,
+  -- Nullable: equipment may not be synced yet
+  equipment_id    UUID REFERENCES public.equipment(id) ON DELETE SET NULL,
+  battery_label   TEXT NOT NULL DEFAULT '',
+  organization_id UUID REFERENCES public.organizations(id),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (mission_id, slot_index)
+);
+
+-- ─── Indexes for new tables ───────────────────────────────────────────────────
+CREATE INDEX IF NOT EXISTS idx_mission_equipment_mission ON public.mission_equipment(mission_id);
+CREATE INDEX IF NOT EXISTS idx_ftf_batteries_mission     ON public.fit_to_fly_batteries(mission_id);
+
+-- ─── RLS for new tables ──────────────────────────────────────────────────────
+ALTER TABLE public.mission_equipment    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.fit_to_fly_batteries ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "mission_equipment_org_isolation"    ON public.mission_equipment;
+CREATE POLICY "mission_equipment_org_isolation" ON public.mission_equipment
+  FOR ALL
+  USING (organization_id = public.my_org_id())
+  WITH CHECK (organization_id = public.my_org_id());
+
+DROP POLICY IF EXISTS "fit_to_fly_batteries_org_isolation" ON public.fit_to_fly_batteries;
+CREATE POLICY "fit_to_fly_batteries_org_isolation" ON public.fit_to_fly_batteries
+  FOR ALL
+  USING (organization_id = public.my_org_id())
+  WITH CHECK (organization_id = public.my_org_id());
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- MIGRATIONS FOR EXISTING DATABASES
+-- Run these on any database that was created before the above columns were
+-- added to the CREATE TABLE statements.
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- aircraft: new columns
+ALTER TABLE public.aircraft ADD COLUMN IF NOT EXISTS photo_url        TEXT;
+ALTER TABLE public.aircraft ADD COLUMN IF NOT EXISTS batteries_needed INTEGER NOT NULL DEFAULT 1;
+-- Partial unique index: enforce unique serial_number per org (only when non-empty)
+CREATE UNIQUE INDEX IF NOT EXISTS aircraft_serial_org_unique
+  ON public.aircraft(serial_number, organization_id)
+  WHERE serial_number != '';
+
+-- battery_logs: sync-parity columns added locally in schema v15–v16
+ALTER TABLE public.battery_logs ADD COLUMN IF NOT EXISTS equipment_id    UUID REFERENCES public.equipment(id);
+ALTER TABLE public.battery_logs ADD COLUMN IF NOT EXISTS battery_type    TEXT NOT NULL DEFAULT '';
+ALTER TABLE public.battery_logs ADD COLUMN IF NOT EXISTS cell_voltages   TEXT NOT NULL DEFAULT '';
+
+-- maintenance_logs: photo paths (added locally in schema v14)
+ALTER TABLE public.maintenance_logs ADD COLUMN IF NOT EXISTS photo_paths TEXT NOT NULL DEFAULT '';
+
+-- incident_reports: photo paths (added locally in schema v14)
+ALTER TABLE public.incident_reports ADD COLUMN IF NOT EXISTS photo_paths TEXT NOT NULL DEFAULT '';
