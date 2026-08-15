@@ -37,7 +37,10 @@ class _SplashScreenState extends State<SplashScreen>
     Future.wait([
       Future.delayed(const Duration(milliseconds: 2200)),
       _checkAuth(),
-    ]).then((_) => _navigate());
+    ]).then((_) => _navigate()).catchError((Object e, StackTrace st) {
+      debugPrint('[SplashScreen] Init error: $e\n$st');
+      _navigate();
+    });
   }
 
   Widget? _destination;

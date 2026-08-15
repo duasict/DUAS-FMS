@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'database/database_helper.dart';
@@ -10,11 +12,15 @@ import 'services/notification_service.dart';
 import 'services/supabase_service.dart';
 import 'theme/app_theme.dart';
 
-void main() async {
+void main() {
+  runZonedGuarded(_boot, (error, stack) {
+    debugPrint('[main] Uncaught zone error: $error\n$stack');
+  });
+}
+
+Future<void> _boot() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Catch Flutter framework errors (layout overflows, widget errors, etc.)
-  // and print them instead of crashing in release builds.
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
   };
@@ -24,7 +30,6 @@ void main() async {
   try {
     await SupabaseService.initialize();
   } catch (e) {
-    // Non-fatal — app can work offline without Supabase
     debugPrint('[main] Supabase init failed: $e');
   }
 
@@ -35,7 +40,6 @@ void main() async {
   }
 
   try {
-    // Pre-warm the encrypted SQLite DB before the first frame.
     await DatabaseHelper.instance.database;
   } catch (e) {
     startupError = e.toString();
