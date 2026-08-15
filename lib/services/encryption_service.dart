@@ -1,42 +1,68 @@
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  EncryptionService
-//
-//  Manages the SQLite database encryption key.
-//
-//  • The key is a 64-character hex string (32 random bytes).
-//  • It is generated once and stored in the platform's secure storage
-//    (Keystore on Android, Keychain on iOS).
-//  • The same key is returned on every subsequent call — the DB can only
-//    be opened on the device that generated it.
-// ─────────────────────────────────────────────────────────────────────────────
 
 class EncryptionService {
   EncryptionService._();
 
-  static const _storage  = FlutterSecureStorage(
+  // Primary storage: EncryptedSharedPreferences (AES-256 + Keystore master key)
+  static const _primary = FlutterSecureStorage(
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
   );
+
+  // Fallback: plain Keystore-backed storage without EncryptedSharedPreferences.
+  // Used when the Jetpack Security library fails to initialise (some OEM ROMs,
+  // work-profile sandboxes, or Keystores invalidated after OS update).
+  static const _fallback = FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: false),
+  );
+
   static const _keyAlias = 'uas_fms_db_key_v1';
 
-  /// Returns the database encryption key, generating and persisting it if this
-  /// is the first call on this device.
-  static Future<String> getDatabaseKey() async {
-    final existing = await _storage.read(key: _keyAlias);
-    if (existing != null && existing.length == 64) return existing;
-
-    // Generate a cryptographically random 32-byte key, encoded as hex
-    final rng      = Random.secure();
-    final keyBytes = List<int>.generate(32, (_) => rng.nextInt(256));
-    final key      =
-        keyBytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-    await _storage.write(key: _keyAlias, value: key);
-    return key;
+  static String _generateKey() {
+    final rng = Random.secure();
+    final bytes = List<int>.generate(32, (_) => rng.nextInt(256));
+    return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
   }
 
-  /// Wipes the stored key — only call this when intentionally resetting app data.
-  static Future<void> clearKey() =>
-      _storage.delete(key: _keyAlias);
+  /// Returns the database encryption key, creating and persisting it on first
+  /// call.  Tries EncryptedSharedPreferences first; if the device's Keystore
+  /// rejects it falls back to plain Keystore-backed storage.
+  static Future<String> getDatabaseKey() async {
+    // ── Try primary storage (EncryptedSharedPreferences) ────────────────────
+    try {
+      final existing = await _primary.read(key: _keyAlias);
+      if (existing != null && existing.length == 64) return existing;
+      final key = _generateKey();
+      await _primary.write(key: _keyAlias, value: key);
+      return key;
+    } catch (e) {
+      debugPrint('[EncryptionService] primary storage failed, trying fallback: $e');
+    }
+
+    // ── Fallback: plain Keystore storage ─────────────────────────────────────
+    try {
+      final existing = await _fallback.read(key: _keyAlias);
+      if (existing != null && existing.length == 64) return existing;
+      // Also migrate a key previously written by primary if possible
+      String? migrated;
+      try { migrated = await _primary.read(key: _keyAlias); } catch (_) {}
+      final key = (migrated != null && migrated.length == 64)
+          ? migrated
+          : _generateKey();
+      await _fallback.write(key: _keyAlias, value: key);
+      return key;
+    } catch (e) {
+      debugPrint('[EncryptionService] fallback storage also failed: $e');
+      throw Exception(
+        'Device secure storage is unavailable. '
+        'This app cannot run without Android Keystore support.',
+      );
+    }
+  }
+
+  static Future<void> clearKey() async {
+    try { await _primary.delete(key: _keyAlias); } catch (_) {}
+    try { await _fallback.delete(key: _keyAlias); } catch (_) {}
+  }
 }
