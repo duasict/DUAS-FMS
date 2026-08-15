@@ -40,13 +40,16 @@ android {
 
     defaultConfig {
         applicationId = "com.duas.fms"
-        minSdk = flutter.minSdkVersion
+        minSdk = 24          // Android 7.0 — floor set by Flutter 3.x + ML Kit + TFLite
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
 
         ndk {
-            abiFilters += listOf("arm64-v8a", "x86_64")
+            // arm64-v8a  : modern 64-bit phones (primary target)
+            // armeabi-v7a: 32-bit ARM phones running Android 7+ (budget/older mid-range)
+            // x86_64     : Android emulators
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
         }
     }
 
