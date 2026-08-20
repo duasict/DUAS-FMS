@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../database/database_helper.dart';
 import '../../models/user_profile.dart';
@@ -20,11 +21,13 @@ class SignUpScreen extends StatefulWidget {
 }
 
 class _SignUpScreenState extends State<SignUpScreen> {
-  final _nameCtrl     = TextEditingController();
-  final _emailCtrl    = TextEditingController();
-  final _passwordCtrl = TextEditingController();
-  final _confirmCtrl  = TextEditingController();
-  final _orgCodeCtrl  = TextEditingController();
+  final _nameCtrl         = TextEditingController();
+  final _emailCtrl        = TextEditingController();
+  final _passwordCtrl     = TextEditingController();
+  final _confirmCtrl      = TextEditingController();
+  final _orgCodeCtrl      = TextEditingController();
+  final _orgNameCtrl      = TextEditingController();
+  final _orgShortCodeCtrl = TextEditingController();
 
   bool _obscurePassword = true;
   bool _obscureConfirm  = true;
@@ -32,14 +35,21 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _success         = false;
   String? _error;
 
-  String _accountType = 'organizational'; // 'organizational' | 'personal'
-  bool get _isPersonal => _accountType == 'personal';
+  String _accountType  = 'organizational'; // 'organizational' | 'personal'
+  bool   _isCreatingOrg = false;           // false = join existing, true = found new org
 
-  // UUID v4 pattern — org codes are Supabase UUIDs
+  bool get _isPersonal    => _accountType == 'personal';
+  bool get _isOrgJoining  => !_isPersonal && !_isCreatingOrg;
+  bool get _isOrgCreating => !_isPersonal && _isCreatingOrg;
+
+  // UUID v4 pattern — join-org codes are Supabase UUIDs
   static final _uuidRe = RegExp(
     r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
     caseSensitive: false,
   );
+
+  // Short code pattern — 2–8 uppercase letters, digits, hyphens
+  static final _shortCodeRe = RegExp(r'^[A-Z0-9\-]{2,8}$');
 
   @override
   void dispose() {
@@ -48,6 +58,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
     _passwordCtrl.dispose();
     _confirmCtrl.dispose();
     _orgCodeCtrl.dispose();
+    _orgNameCtrl.dispose();
+    _orgShortCodeCtrl.dispose();
     super.dispose();
   }
 
@@ -56,14 +68,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
     final email   = _emailCtrl.text.trim();
     final pass    = _passwordCtrl.text;
     final confirm = _confirmCtrl.text;
-    final orgCode = _orgCodeCtrl.text.trim();
 
+    // Common validation
     if (name.isEmpty || email.isEmpty || pass.isEmpty) {
       setState(() => _error = 'Please fill in all required fields.');
-      return;
-    }
-    if (!_isPersonal && orgCode.isEmpty) {
-      setState(() => _error = 'Organization code is required.');
       return;
     }
     if (pass != confirm) {
@@ -74,60 +82,130 @@ class _SignUpScreenState extends State<SignUpScreen> {
       setState(() => _error = 'Password must be at least 6 characters.');
       return;
     }
-    if (!_isPersonal && !_uuidRe.hasMatch(orgCode)) {
-      setState(() => _error =
-          'Invalid organization code. Ask your CRP for the correct code.');
-      return;
+
+    // Org-specific validation
+    if (_isOrgJoining) {
+      final orgCode = _orgCodeCtrl.text.trim();
+      if (orgCode.isEmpty) {
+        setState(() => _error = 'Organization code is required.');
+        return;
+      }
+      if (!_uuidRe.hasMatch(orgCode)) {
+        setState(() => _error =
+            'Invalid organization code. Ask your CRP for the correct code.');
+        return;
+      }
+    }
+    if (_isOrgCreating) {
+      final orgName      = _orgNameCtrl.text.trim();
+      final orgShortCode = _orgShortCodeCtrl.text.trim().toUpperCase();
+      if (orgName.isEmpty) {
+        setState(() => _error = 'Organization name is required.');
+        return;
+      }
+      if (!_shortCodeRe.hasMatch(orgShortCode)) {
+        setState(() => _error =
+            'Org code must be 2–8 characters (letters, numbers, hyphens).');
+        return;
+      }
     }
 
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    setState(() { _isLoading = true; _error = null; });
 
     try {
-      final response = await SupabaseService.signUp(email, pass);
-
-      await DatabaseHelper.instance.saveUserProfile(UserProfile(
-        supabaseId: response.user?.id ?? '',
-        name: name,
-        email: email,
-        organizationId: _isPersonal ? '' : orgCode,
-        role: 'vo',
-        accountType: _accountType,
-      ));
-
-      if (response.session != null && response.user != null) {
-        try {
-          await SupabaseService.upsertProfile({
-            'id': response.user!.id,
-            'name': name,
-            'organization_id': _isPersonal ? null : orgCode,
-            'email': email,
-            'role': 'vo',
-            'account_type': _accountType,
-          });
-        } catch (_) {
-          // Non-fatal — will be applied on first login
-        }
+      if (_isOrgCreating) {
+        await _signUpWithNewOrg(name, email, pass);
+      } else {
+        await _signUpJoinOrCreate(name, email, pass);
       }
-
       if (mounted) setState(() { _isLoading = false; _success = true; });
     } on AuthException catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = _friendlyError(e.message);
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() { _error = _friendlyError(e.message); _isLoading = false; });
     } catch (_) {
-      if (mounted) {
-        setState(() {
-          _error = 'Unable to connect. Check your internet connection.';
-          _isLoading = false;
+      if (mounted) setState(() { _error = 'Unable to connect. Check your internet connection.'; _isLoading = false; });
+    }
+  }
+
+  /// Standard sign-up: join an existing org or create a personal account.
+  Future<void> _signUpJoinOrCreate(String name, String email, String pass) async {
+    final orgCode = _isPersonal ? '' : _orgCodeCtrl.text.trim();
+    final response = await SupabaseService.signUp(email, pass);
+
+    await DatabaseHelper.instance.saveUserProfile(UserProfile(
+      supabaseId: response.user?.id ?? '',
+      name: name,
+      email: email,
+      organizationId: orgCode,
+      role: 'vo',
+      accountType: _accountType,
+    ));
+
+    if (response.session != null && response.user != null) {
+      try {
+        await SupabaseService.upsertProfile({
+          'id': response.user!.id,
+          'name': name,
+          'organization_id': orgCode.isEmpty ? null : orgCode,
+          'email': email,
+          'role': 'vo',
+          'account_type': _accountType,
         });
+      } catch (_) {
+        // Non-fatal — will be applied on first login
       }
     }
+  }
+
+  /// Sign-up flow for founding a new organization.
+  /// Creates the auth user, then either creates the org immediately (if a
+  /// session is returned) or saves the intent for completion on first login.
+  Future<void> _signUpWithNewOrg(String name, String email, String pass) async {
+    final orgName      = _orgNameCtrl.text.trim();
+    final orgShortCode = _orgShortCodeCtrl.text.trim().toUpperCase();
+
+    final response = await SupabaseService.signUp(email, pass);
+    final userId   = response.user?.id ?? '';
+
+    // Save locally first; org ID filled in below or deferred to first login.
+    await DatabaseHelper.instance.saveUserProfile(UserProfile(
+      supabaseId: userId,
+      name: name,
+      email: email,
+      organizationId: '',
+      role: 'crp',
+      accountType: 'organizational',
+    ));
+
+    if (response.session != null && userId.isNotEmpty) {
+      // Session available — create org immediately.
+      try {
+        final newOrgId = await SupabaseService.createOrganization({
+          'name': orgName,
+          'code': orgShortCode,
+        });
+        final existing = await DatabaseHelper.instance.getUserProfile();
+        if (existing != null) {
+          await DatabaseHelper.instance.saveUserProfile(
+              existing.copyWith(organizationId: newOrgId));
+        }
+        await SupabaseService.upsertProfile({
+          'id': userId,
+          'name': name,
+          'organization_id': newOrgId,
+          'email': email,
+          'role': 'crp',
+          'account_type': 'organizational',
+        });
+        return; // Done — no pending data needed.
+      } catch (_) {
+        // Fall through to deferred path below.
+      }
+    }
+
+    // Deferred: save org creation intent; login screen will complete it.
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('pending_org_name', orgName);
+    await prefs.setString('pending_org_code', orgShortCode);
   }
 
   String _friendlyError(String raw) {
@@ -265,27 +343,57 @@ class _SignUpScreenState extends State<SignUpScreen> {
         ),
         const SizedBox(height: 14),
 
-        // Org code — organizational accounts only
-        if (!_isPersonal)
-          TextField(
-            controller: _orgCodeCtrl,
-            style: TextStyle(color: context.colors.textPrimary, fontSize: 13),
-            textInputAction: TextInputAction.done,
-            onSubmitted: (_) => _signUp(),
-            decoration: InputDecoration(
-              labelText: 'Organization Code',
-              hintText: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
-              hintStyle: TextStyle(
-                  color: context.colors.textMuted,
-                  fontSize: 11,
-                  fontFamily: 'monospace'),
-              prefixIcon: Icon(Icons.key_outlined,
-                  color: context.colors.textMuted, size: 18),
-              helperText: 'Ask your CRP for this code.',
-              helperStyle:
-                  TextStyle(color: context.colors.textMuted, fontSize: 11),
+        // Org section — organizational accounts only
+        if (!_isPersonal) ...[
+          _orgModeSelector(context),
+          const SizedBox(height: 14),
+          if (_isOrgJoining)
+            TextField(
+              controller: _orgCodeCtrl,
+              style: TextStyle(color: context.colors.textPrimary, fontSize: 13),
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => _signUp(),
+              decoration: InputDecoration(
+                labelText: 'Organization Code',
+                hintText: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
+                hintStyle: TextStyle(
+                    color: context.colors.textMuted,
+                    fontSize: 11,
+                    fontFamily: 'monospace'),
+                prefixIcon: Icon(Icons.key_outlined,
+                    color: context.colors.textMuted, size: 18),
+                helperText: 'Ask your CRP for this code.',
+                helperStyle:
+                    TextStyle(color: context.colors.textMuted, fontSize: 11),
+              ),
             ),
-          ),
+          if (_isOrgCreating) ...[
+            _field(
+              controller: _orgNameCtrl,
+              label: 'Organization Name',
+              icon: Icons.business_outlined,
+              action: TextInputAction.next,
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _orgShortCodeCtrl,
+              textCapitalization: TextCapitalization.characters,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => _signUp(),
+              style: TextStyle(color: context.colors.textPrimary),
+              decoration: InputDecoration(
+                labelText: 'Org Short Code',
+                hintText: 'e.g. DUAS  (2–8 chars)',
+                hintStyle: TextStyle(color: context.colors.textMuted, fontSize: 12),
+                prefixIcon: Icon(Icons.tag_outlined,
+                    color: context.colors.textMuted, size: 18),
+                helperText: 'Letters, numbers, hyphens. Used in mission IDs.',
+                helperStyle:
+                    TextStyle(color: context.colors.textMuted, fontSize: 11),
+              ),
+            ),
+          ],
+        ],
 
         // Error banner
         if (_error != null) ...[
@@ -357,10 +465,53 @@ class _SignUpScreenState extends State<SignUpScreen> {
     ]);
   }
 
+  Widget _orgModeSelector(BuildContext context) {
+    return Row(children: [
+      Expanded(child: _orgModeChip(context, false, Icons.group_add_outlined, 'Join existing')),
+      const SizedBox(width: 10),
+      Expanded(child: _orgModeChip(context, true, Icons.add_business_outlined, 'Found new org')),
+    ]);
+  }
+
+  Widget _orgModeChip(BuildContext context, bool creating, IconData icon, String label) {
+    final selected = _isCreatingOrg == creating;
+    return GestureDetector(
+      onTap: () => setState(() => _isCreatingOrg = creating),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.primary.withValues(alpha: 0.10)
+              : context.colors.surface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: selected ? AppColors.primary : context.colors.border,
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon,
+              size: 20,
+              color: selected ? AppColors.primary : context.colors.textMuted),
+          const SizedBox(height: 4),
+          Text(label,
+              style: TextStyle(
+                  color: selected ? AppColors.primary : context.colors.textSecondary,
+                  fontSize: 11,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w400)),
+        ]),
+      ),
+    );
+  }
+
   Widget _typeChip(BuildContext context, String type, IconData icon, String label) {
     final selected = _accountType == type;
     return GestureDetector(
-      onTap: () => setState(() => _accountType = type),
+      onTap: () => setState(() {
+        _accountType = type;
+        if (type == 'personal') _isCreatingOrg = false;
+      }),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(vertical: 12),

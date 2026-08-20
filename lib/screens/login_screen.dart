@@ -158,6 +158,34 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       }
 
+      // Deferred org creation: user chose "Found new org" at sign-up but
+      // email confirmation was required so the INSERT could not run then.
+      // Now that we have a session, complete it.
+      if (remoteOrgId.isEmpty && updated.organizationId.isEmpty) {
+        final prefs        = await SharedPreferences.getInstance();
+        final pendingName  = prefs.getString('pending_org_name') ?? '';
+        final pendingCode  = prefs.getString('pending_org_code') ?? '';
+        if (pendingName.isNotEmpty && pendingCode.isNotEmpty) {
+          try {
+            final newOrgId = await SupabaseService.createOrganization({
+              'name': pendingName,
+              'code': pendingCode,
+            });
+            final withOrg = updated.copyWith(organizationId: newOrgId, role: 'crp');
+            await DatabaseHelper.instance.saveUserProfile(withOrg);
+            await SupabaseService.upsertProfile({
+              'id': userId,
+              'organization_id': newOrgId,
+              'role': 'crp',
+            });
+            await prefs.remove('pending_org_name');
+            await prefs.remove('pending_org_code');
+          } catch (_) {
+            // Will retry on next login
+          }
+        }
+      }
+
       if (mounted) {
         await context.read<UserProfileProvider>().load();
       }

@@ -44,6 +44,17 @@ class SupabaseService {
   static Future<void> upsertProfile(Map<String, dynamic> data) =>
       client.from('profiles').upsert(data);
 
+  /// Creates a new organization row and returns its Supabase UUID.
+  /// Requires an authenticated session (RLS INSERT policy enforces this).
+  static Future<String> createOrganization(Map<String, dynamic> data) async {
+    final result = await client
+        .from('organizations')
+        .insert(data)
+        .select('id')
+        .single();
+    return result['id'] as String;
+  }
+
   // ── Missions ─────────────────────────────────────────────────────────────
 
   /// Upserts a mission and returns its Supabase UUID.

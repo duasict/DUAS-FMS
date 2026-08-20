@@ -483,10 +483,15 @@ RETURNS UUID LANGUAGE SQL STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT organization_id FROM public.profiles WHERE id = auth.uid()
 $$;
 
--- ── Organizations: members read their own org ─────────────────────────────────
+-- ── Organizations: members read their own org; authenticated users may create ──
 DROP POLICY IF EXISTS "org_select" ON public.organizations;
 CREATE POLICY "org_select" ON public.organizations
   FOR SELECT USING (id = public.my_org_id());
+
+-- Any authenticated user may INSERT a new org (they become CRP afterward).
+DROP POLICY IF EXISTS "org_insert" ON public.organizations;
+CREATE POLICY "org_insert" ON public.organizations
+  FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
 
 -- ── Profiles: users see own org; users update only their own row ──────────────
 DROP POLICY IF EXISTS "profiles_select" ON public.profiles;
